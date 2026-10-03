@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simuladores</title>
+<link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+<header>
+  <nav id="nav" aria-label="Navega&ccedil;&atilde;o principal">
+    <a href="#inicio" data-k="inicio">P&aacute;gina principal</a>
+    <a href="#indicacao" data-k="indicacao">Simula&ccedil;&atilde;o de indica&ccedil;&atilde;o</a>
+    <a href="#consumo" data-k="consumo">Simula&ccedil;&atilde;o de consumo de energia</a>
+  </nav>
+</header>
+<div id="menu">
+  <h1>Simuladores</h1>
+  <p class="sub">Escolha qual simula&ccedil;&atilde;o deseja realizar.</p>
+  <div class="opts">
+    <button class="opt" data-k="indicacao" type="button">
+      <div class="ico">&#127873;</div><h2>Desconto por indica&ccedil;&atilde;o</h2>
+      <p>Informe as faturas de quem indica e do indicado e veja o abatimento, os meses de isen&ccedil;&atilde;o e o valor do m&ecirc;s em que volta a pagar.</p>
+    </button>
+    <button class="opt" data-k="consumo" type="button">
+      <div class="ico">&#9889;</div><h2>M&eacute;dia e necessidade de consumo</h2>
+      <p>Calcule a m&eacute;dia dos &uacute;ltimos meses, some AC, outros produtos e gera&ccedil;&atilde;o, e confira se o cliente atinge o m&iacute;nimo da faixa de atendimento.</p>
+    </button>
+  </div>
+  <section id="stats" hidden>
+    <h3>Uso da ferramenta</h3>
+    <div class="kpis">
+      <div class="kpi"><b id="kAcessos">-</b><span>Acessos</span></div>
+      <div class="kpi"><b id="kSims">-</b><span>Simula&ccedil;&otilde;es realizadas</span><span id="kSimsDet"></span></div>
+    </div>
+    <h3 class="mt-18">Top 5 localidades</h3>
+    <ul id="top5"><li class="mute">Carregando...</li></ul>
+    <p class="priv">Estat&iacute;sticas an&ocirc;nimas, sem cookies e sem dados pessoais. A localidade &eacute; estimada pelo pa&iacute;s/regi&atilde;o do acesso.</p>
+  </section>
+</div>
+<div id="tool">
+  <iframe id="frame" title="Simulador"></iframe>
+</div>
+<script src="config.js"></script>
+<script src="js/index.js"></script>
+</body>
+</html>

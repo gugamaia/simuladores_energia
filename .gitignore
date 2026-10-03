@@ -1,0 +1,40 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# Segredos e chaves (NUNCA enviar ao repositorio)
+.env
+.env.*
+.dev.vars
+*.pem
+*.key
+secrets/
+
+# Cloudflare Worker (arquivos locais de deploy)
+.wrangler/
+wrangler.toml
+
+# Dependencias e logs
+node_modules/
+*.log
+npm-debug.log*
+
+# Arquivos temporarios, rascunhos e pacotes
+*.zip
+*.bak
+*.tmp
+tmp/
+rascunhos/
+
+# Faturas e dados de clientes usados em testes (dados pessoais)
+faturas/
+*.pdf
+
+README.md

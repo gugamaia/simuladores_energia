@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de desconto por indicação</title>
+<link rel="stylesheet" href="css/indicacao.css">
+</head>
+<body>
+<main>
+  <h1>Simulador de desconto por indicação</h1>
+  <p class="sub">Informe as faturas e veja o abatimento de quem indica e de quem é indicado.</p>
+
+  <section class="card">
+    <div class="grid">
+      <div>
+        <label for="fInd">Fatura de quem indica</label>
+        <div class="in"><span>R$</span><input id="fInd" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00"></div>
+      </div>
+      <div>
+        <label for="fInv">Fatura do indicado</label>
+        <div class="in"><span>R$</span><input id="fInv" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00"></div>
+      </div>
+      <div>
+        <label for="pInv">Desconto do indicado no 1º mês</label>
+        <div class="in"><input id="pInv" type="number" inputmode="decimal" min="0" max="100" step="1" value="50"><span>%</span></div>
+      </div>
+      <div>
+        <label for="pInd">Crédito de quem indica</label>
+        <div class="in"><input id="pInd" type="number" inputmode="decimal" min="0" max="100" step="1" value="100"><span>%</span></div>
+        <small>% do desconto concedido ao indicado. 100% = mesmo valor.</small>
+      </div>
+    </div>
+  </section>
+
+  <div id="out"><p class="empty">Preencha as duas faturas para simular.</p></div>
+  <footer class="credit">Documento criado por Gustavo Maia</footer>
+</main>
+
+<script src="js/indicacao.js"></script>
+<script src="js/rastreio.js" data-ferramenta="indicacao" data-alvo="#out" data-valido="#out .hl"></script>
+</body>
+</html>

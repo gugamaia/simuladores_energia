@@ -1,0 +1,33 @@
+:root{--bg:#f3f5f7;--card:#fff;--ink:#14212b;--mute:#5d6b76;--line:#d9e0e5;--acc:#0b5cad;--accbg:#e4effa;--ok:#0f7b4f;--okbg:#e2f4ec;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f161c;--card:#18222b;--ink:#e8eef2;--mute:#93a2ae;--line:#2b3842;--acc:#6db2f2;--accbg:#173247;--ok:#5fd1a0;--okbg:#153429}}
+:root[data-theme="dark"]{--bg:#0f161c;--card:#18222b;--ink:#e8eef2;--mute:#93a2ae;--line:#2b3842;--acc:#6db2f2;--accbg:#173247;--ok:#5fd1a0;--okbg:#153429}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.5rem;margin:0 0 4px}
+p.sub{margin:0 0 20px;color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+label{display:block;font-weight:600;font-size:.9rem;margin-bottom:4px}
+.in{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:0 10px}
+.in:focus-within{outline:2px solid var(--acc)}
+.in span{color:var(--mute);margin-right:6px}
+input{width:100%;border:0;background:transparent;color:var(--ink);font:inherit;padding:10px 0;outline:none}
+small{display:block;color:var(--mute);margin-top:4px;font-size:.8rem}
+h2{font-size:1rem;margin:0 0 10px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row b{white-space:nowrap}
+.hl{background:var(--okbg);border-color:transparent}
+.hl .big{font-size:1.15rem;font-weight:700;color:var(--ok);margin:0}
+.note{background:var(--accbg);border-radius:6px;padding:10px 12px;font-size:.88rem;color:var(--ink)}
+.empty{color:var(--mute)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+th{color:var(--mute);font-weight:600}
+td.r,th.r{text-align:right}
+.scroll{overflow-x:auto}
+.credit{margin-top:24px;text-align:center;color:var(--mute);font-size:.85rem}

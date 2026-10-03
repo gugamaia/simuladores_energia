@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validador de lead - consumo médio x faixa de atendimento</title>
+<link rel="stylesheet" href="css/consumo.css">
+</head>
+<body>
+<header><h1>Validador de lead – consumo médio x faixa de atendimento</h1></header>
+<main>
+  <p class="hint">Preencha os meses de consumo do lead (até 12), selecione a distribuidora e o tipo de atendimento. A média considera apenas os meses informados.</p>
+  <div class="layout">
+    <section>
+    <div class="card">
+      <details open>
+        <summary>Importar fatura da distribuidora</summary>
+        <p class="legend">Envie a fatura em PDF (com texto selecionável) para preencher os campos automaticamente. O arquivo é lido no seu navegador, sem envio a servidores. Revise os dados preenchidos.</p>
+        <input type="file" id="fatura" accept="application/pdf,.pdf">
+        <div id="impStatus" class="note" hidden></div>
+        <details class="sub">
+          <summary>Texto extraído (conferência / colar manualmente)</summary>
+          <textarea id="impTexto" rows="6" placeholder="O texto da fatura aparece aqui. Você também pode colar o texto e reanalisar."></textarea>
+          <button class="btn" id="reanalisar" type="button">Reanalisar texto</button>
+        </details>
+      </details>
+    </div>
+    <div class="card">
+      <h2>Dados do lead</h2>
+      <label for="dist">Distribuidora</label>
+      <select id="dist"></select>
+      <label for="tipo">Tipo de atendimento</label>
+      <select id="tipo">
+        <option value="">Selecione...</option>
+        <option>Monofásico</option><option>Bifásico</option><option>Trifásico</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="social"><span>Cliente com benefício do governo (tarifa social)<small>Desconta 200 kWh da média antes de comparar com o mínimo.</small></span></label>
+      <h2 class="mt-18">Consumo dos últimos meses (kWh)</h2>
+      <div class="months" id="months"></div>
+      <button class="btn" id="limpar" type="button">Limpar consumos, produtos e geração</button>
+    </div>
+    <div class="card">
+      <details open>
+        <summary>Ar-condicionado a instalar<span id="acBadge" class="badge"></span></summary>
+        <p class="legend">Informe a quantidade de cada modelo (pode somar vários aparelhos). O consumo extra por aparelho é editável.</p>
+        <div class="acrow achead"><span>Modelo</span><span>Extra (kWh/mês)</span><span>Qtd</span></div>
+        <div id="acs"></div>
+      </details>
+    </div>
+    <div class="card">
+      <details open>
+        <summary>Outros produtos<span id="oBadge" class="badge"></span></summary>
+        <p class="legend">Adicione outros equipamentos que entram na média mensal (consumo em kWh por mês de cada unidade).</p>
+        <div id="outros"></div>
+        <h2 class="mt-14">Adicionar produto</h2>
+        <div class="addrow oadd">
+          <input type="text" id="oNome" placeholder="Produto (ex.: Chuveiro elétrico)">
+          <input type="number" id="oKwh" min="0" placeholder="kWh/mês">
+          <input type="number" id="oQtd" min="1" step="1" placeholder="Qtd">
+        </div>
+        <button class="btn" id="oAdd" type="button">Adicionar produto</button>
+      </details>
+    </div>
+    <div class="card">
+      <details open>
+        <summary>Cliente possui geração/injeção<span id="gBadge" class="badge"></span></summary>
+        <p class="legend">Se o cliente recebe energia de geração/injeção, informe o valor mensal. Ele é somado à média de consumo.</p>
+        <label class="chk"><input type="checkbox" id="gPossui"><span>Cliente possui geração/injeção</span></label>
+        <div id="gCampos" hidden>
+          <label for="gKwh">Energia recebida por mês (kWh)</label>
+          <input type="number" id="gKwh" min="0" step="1" placeholder="0">
+          <label class="chk"><input type="checkbox" id="gCarteira"><span>Possui carteira de energia com valor acumulado<small>O saldo não entra na média mensal; é usado na previsão de duração.</small></span></label>
+          <div id="gCart" hidden>
+            <label for="gSaldo">Saldo acumulado na carteira (kWh)</label>
+            <input type="number" id="gSaldo" min="0" step="1" placeholder="0">
+            <p class="legend" id="gPrev"></p>
+          </div>
+        </div>
+      </details>
+    </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h2>Resultado</h2>
+        <div class="row"><span>Meses informados</span><b id="qtd">0</b></div>
+        <div class="row"><span>Total consumido (kWh)</span><b id="total">–</b></div>
+        <div class="row"><span>Tipo de relógio</span><b id="relogio">–</b></div>
+        <div class="row"><span>Média informada (kWh)</span><b id="media">–</b></div>
+        <div class="row"><span>Consumo extra de AC (kWh)</span><b id="acExtra">–</b></div>
+        <div class="row"><span>Consumo extra de outros produtos (kWh)</span><b id="outrosExtra">–</b></div>
+        <div class="row"><span>Energia recebida – geração/injeção (kWh)</span><b id="gerExtra">–</b></div>
+        <div class="row"><span>Desconto tarifa social</span><b id="desc">–</b></div>
+        <div class="row"><span>Média considerada (kWh)</span><b id="considerada">–</b></div>
+        <div class="row"><span>Mínimo da faixa (kWh)</span><b id="minimo">–</b></div>
+        <div class="row"><span>Diferença para o mínimo</span><b id="dif">–</b></div>
+        <div class="row"><span>Saldo na carteira de energia (kWh)</span><b id="carteira">–</b></div>
+        <div class="row"><span>Previsão de duração da carteira</span><b id="carteiraPrev">–</b></div>
+        <div class="status warn" id="status">FALTA CONFIGURAR<small>Selecione a distribuidora, o tipo e informe ao menos um mês.</small></div>
+        <div id="alerta"></div>
+        <div class="alert" id="alertBox" hidden>
+          <b>⚠ Atenção: consumo fora do padrão</b>
+          <p class="legend">Confirme com o lead se estes meses devem entrar na média. Marque para desconsiderar.</p>
+          <div id="alertList"></div>
+        </div>
+        <div class="thr">Alertar quando um mês variar mais de <input type="number" id="limiar" min="1" max="500" value="30"> % da média</div>
+        <p class="legend">Verde: média dentro da faixa · Vermelho: média fora da faixa · Laranja: falta configurar/selecionar.</p>
+      </div>
+      <div class="card">
+        <details open>
+          <summary>Parâmetros de atendimento (editáveis)</summary>
+          <p class="legend">Altere os mínimos (kWh) quando houver mudança. As alterações ficam salvas neste navegador.</p>
+          <div class="scroll"><table><thead><tr><th>Distribuidora</th><th>Mono</th><th>Bi</th><th>Tri</th><th></th></tr></thead><tbody id="params"></tbody></table></div>
+          <h2 class="mt-14">Adicionar / atualizar distribuidora</h2>
+          <div class="addrow">
+            <input type="text" id="nNome" placeholder="Nome (ex.: CELESC - SC)">
+            <input type="number" id="nMono" min="0" placeholder="Mono">
+            <input type="number" id="nBi" min="0" placeholder="Bi">
+            <input type="number" id="nTri" min="0" placeholder="Tri">
+          </div>
+          <button class="btn" id="add" type="button">Salvar distribuidora</button>
+          <button class="btn" id="restaurar" type="button">Restaurar valores originais</button>
+        </details>
+      </div>
+    </section>
+  </div>
+  <div class="card">
+    <details>
+      <summary>Configuração do alerta de variação</summary>
+      <label for="lim">Alertar quando um mês variar mais de (%) em relação à média</label>
+      <input type="number" id="lim" min="1" step="1" value="30">
+    </details>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="js/consumo.js"></script>
+<script src="js/rastreio.js" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
+</body>
+</html>

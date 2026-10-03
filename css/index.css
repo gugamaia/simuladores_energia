@@ -1,0 +1,41 @@
+:root{--bg:#f3f5f7;--card:#fff;--ink:#14212b;--mute:#5d6b76;--line:#d9e0e5;--acc:#1f4e79}
+@media (prefers-color-scheme:dark){:root{--bg:#0f161c;--card:#18222b;--ink:#e8eef2;--mute:#93a2ae;--line:#2b3842;--acc:#6db2f2}}
+*{box-sizing:border-box}
+html{height:100%}
+body{min-height:100%;margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,-apple-system,Arial,sans-serif;display:flex;flex-direction:column}
+#menu{max-width:760px;margin:0 auto;padding:40px 16px;width:100%}
+h1{font-size:1.6rem;margin:0 0 6px}
+.sub,.mute{color:var(--mute)}
+.sub{margin:0 0 28px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:620px){.opts{grid-template-columns:1fr}}
+.opt{display:block;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:22px;cursor:pointer;font:inherit}
+.opt:hover,.opt:focus-visible{border-color:var(--acc);outline:2px solid var(--acc)}
+.opt .ico{font-size:1.8rem}
+.opt h2{margin:8px 0 6px;font-size:1.1rem}
+.opt p{margin:0;color:var(--mute);font-size:.92rem}
+#stats{margin-top:32px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+#stats h3{margin:0 0 12px;font-size:1rem}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kpi b{display:block;font-size:1.6rem;line-height:1.2}
+.kpi span{color:var(--mute);font-size:.85rem;display:block}
+#top5{margin:14px 0 0;padding:0;list-style:none}
+#top5 li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+#top5 li:last-child{border-bottom:0}
+.priv{margin-top:12px;font-size:.78rem;color:var(--mute)}
+#tool{display:none;flex:1;flex-direction:column;min-height:0}
+iframe{flex:1;width:100%;border:0;background:var(--bg)}
+
+/* utilitarios */
+.mt-18{margin-top:18px}
+
+/* estados do menu (alternados pelo js/index.js) */
+#menu.oculto{display:none}
+#tool.ativo{display:flex}
+
+/* barra de navegacao superior */
+#nav{position:sticky;top:0;z-index:10;display:flex;gap:4px;padding:6px 12px;overflow-x:auto;background:var(--card);border-bottom:1px solid var(--line)}
+#nav a{white-space:nowrap;padding:8px 14px;border-radius:8px;color:var(--mute);text-decoration:none;font-size:.95rem}
+#nav a:hover{color:var(--ink);background:var(--bg)}
+#nav a.ativo{color:var(--acc);background:var(--bg);font-weight:600}
+#nav a:focus-visible{outline:2px solid var(--acc)}
