@@ -1,0 +1,18 @@
+{
+ "origem": "Copel - residencial trifásico /50A (print de celular; histórico cortado); texto transcrito",
+ "texto": "Copel Distribuição S.A.\nClassificação: B1 Residencial / Residencial Tipo de Fornecimento: Trifasico /50A\nREF: MÊS / ANO 06/2026 VENCIMENTO 12/07/2026 TOTAL A PAGAR R$447,91\nItens de fatura Unid. Quant.\nENERGIA ELET CONSUMO kWh 459 0,372898 171,16\nENERGIA ELET USO SISTEMA kWh 459 0,495904 227,62\nENERGIA CONS. B.AMARELA kWh 459,00 0,025490 11,70\nCONT ILUMIN PUBLICA MUNICIPIO UN 37,430000 37,43\nMedidor Grandezas Postos horários Leitura Anterior Leitura Atual Const Medidor Consumo kWh\n0000000000 CONSUMO kWh TP 22879 23338 1 459\n",
+ "esperado": {
+  "origem": "Copel - residencial trifásico /50A (print de celular; histórico cortado); texto transcrito",
+  "distribuidora": "COPEL - PR",
+  "tipo": "Trifásico",
+  "social": false,
+  "atual": 459,
+  "meses": [
+   [
+    "atual",
+    459
+   ]
+  ],
+  "nota": "Sem histórico visível: o Mês 01 vem do item de consumo (459 kWh)."
+ }
+}

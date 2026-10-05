@@ -278,14 +278,14 @@ function analisarFatura(txt){
   });
   r.dist = best ? best.d : null;
   // tipo de atendimento
-  const mt = T.match(/(MONO|BI|TRI)FASIC[OA]\b/);
-  r.tipo = mt ? {MONO:'Monofásico',BI:'Bifásico',TRI:'Trifásico'}[mt[1]] : null;
+  const mt = T.match(/(MONO|BI|TRI)FASIC[OA]\b/) || T.match(/\bB[1-4]\s*\/\s*(MONO|BIF|TRI)\b/);   // ex.: "B1 / MONO" (Equatorial)
+  r.tipo = mt ? {MONO:'Monofásico',BI:'Bifásico',BIF:'Bifásico',TRI:'Trifásico'}[mt[1]] : null;
   // histórico de consumo: Mês 01 = mais recente, em ordem decrescente
   const hist = new Map();
   let estrito = false;
   const add = (a,m,v)=>{ if(estrito && /[.,]/.test(v)) return; if(a<100) a+=2000; const k=a*12+m; if(!hist.has(k)) hist.set(k,{rot:ROT[m-1]+'/'+String(a).slice(2),v:brNum(v)}); };
   const reA = /\b(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*[\/\-.]?\s*(\d{2,4})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
-  const reB = /(?<![\/\d])(0[1-9]|1[0-2])\s*\/\s*(20\d{2})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
+  const reB = /(?<![A-Z\/\d])(0[1-9]|1[0-2])\s*\/\s*(20\d{2})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
   const scan = t=>{ for(const m of t.matchAll(reA)) add(+m[2],MESES[m[1]],m[3]); for(const m of t.matchAll(reB)) add(+m[2],+m[1],m[3]); };
   semAcento(txt).toUpperCase().split('\n').forEach(scan);
   if(hist.size<3){
@@ -300,14 +300,23 @@ function analisarFatura(txt){
     if(hist.size===n0){ estrito = true; scan(T); estrito = false; }
   }
   r.meses = [...hist.entries()].sort((a,b)=>b[0]-a[0]).slice(0,12).map(e=>e[1]);
-  // consumo atual = quantidade do item de consumo na fatura
-  const ic = T.match(/(?:CONSUMO EM KWH|CONSUMO KWH|CONSUMO ATIVO|ENERGIA ELETRICA|ENERGIA ATIVA|CONSUMO)\s+(?:KWH\s+)?(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/);
-  r.atual = ic ? brNum(ic[1]) : null;
-  if(r.atual!=null){
-    if(!r.meses.length) r.meses = [{rot:'atual',v:r.atual}];
-    else if(r.meses[0].v!==r.atual){
-      r.aviso = 'O consumo do item da fatura ('+fmt(r.atual)+' kWh) difere do mês mais recente do histórico ('+fmt(r.meses[0].v)+' kWh). Usei o valor do item no Mês 01.';
-      r.meses[0].v = r.atual;
+  // fatura de alta tensão (grupo A: consumo ponta / fora de ponta): o histórico mensal total não é preenchido
+  r.grupoA = /CONSUMO PONTA|CONSUMO FORA DE PONTA|TARIFA (?:VERDE|AZUL)/.test(T);
+  if(r.grupoA){
+    r.meses = []; r.atual = null;
+    r.aviso = 'Fatura de alta tensão (grupo A, ponta/fora de ponta): o histórico não é preenchido automaticamente. Informe o consumo mensal total.';
+  } else {
+    // consumo atual = quantidade do item de consumo (soma as faixas, ex.: tarifa social "até 80 kWh" + "acima")
+    const reI = /(?:CONSUMO EM KWH|CONSUMO KWH|CONSUMO ATIVO|ENERGIA ELETRICA|ENERGIA ATIVA|CONSUMO)\s+(?:KWH\s+)?(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
+    const itens = [...T.matchAll(reI)].map(m=>brNum(m[1])), soma = itens.reduce((a,b)=>a+b,0);
+    r.atual = !itens.length ? null : (itens.length>1 && (!r.meses.length || soma===r.meses[0].v)) ? soma : itens[0];
+    if(r.atual!=null){
+      if(!r.meses.length){
+        r.meses = [{rot:'atual',v:r.atual}];
+        if(itens.length>1) r.aviso = 'Somei as faixas do item de consumo ('+itens.join(' + ')+'). Confira o valor.';
+      } else if(r.meses[0].v!==r.atual){
+        r.aviso = 'O consumo do item da fatura ('+fmt(r.atual)+' kWh) difere do mês mais recente do histórico ('+fmt(r.meses[0].v)+' kWh). Mantive o histórico; confira o Mês 01.';
+      }
     }
   }
   // geração/injeção e carteira
@@ -364,21 +373,28 @@ function historicoGeometrico(items){
     const c = labels.filter(l=>l.x < n.x-5).map(l=>({l, d:Math.abs(l.y-n.y)})).sort((a,b)=>a.d-b.d)[0];
     if(c && c.d<=win) dono.get(c.l).push(n);
   });
+  // descarta a coluna de "dias de faturamento" (cabeçalho "Nº DIAS" acima da coluna, ou valores todos entre 26 e 35)
+  const cab = items.filter(i=>i.str.trim().length<=16 && /\bDIAS\b/.test(semAcento(i.str).toUpperCase()) && i.transform[5] > ys[0] && i.transform[5] - ys[0] < 60).map(i=>({x:i.transform[4], w:i.width||40}));   // cabeçalho curto, logo acima da lista
+  const cols = [];
+  [...dono.values()].flat().sort((a,b)=>a.x-b.x).forEach(n=>{ const c = cols.find(c=>Math.abs(c.x-n.x)<=12); if(c) c.v.push(n); else cols.push({x:n.x, v:[n]}); });
+  const dias = new Set();
+  cols.forEach(c=>{
+    const doCab = cab.some(h=>c.x >= h.x-15 && c.x <= h.x+h.w+15);
+    const faixa = c.v.length>=4 && c.v.every(n=>{ const v = parseFloat(n.t.replace(',','.')); return Number.isInteger(v) && v>=26 && v<=35; });
+    if(doCab || faixa) c.v.forEach(n=>dias.add(n));
+  });
   return labels.map(l=>{
-    const v = dono.get(l).sort((a,b)=>a.x-b.x)[0];   // 1ª coluna numérica = kWh (as seguintes: dias etc.)
+    const v = dono.get(l).filter(n=>!dias.has(n)).sort((a,b)=>a.x-b.x)[0];   // 1ª coluna numérica restante = kWh
     return v ? 'HISTORICO ' + l.t + ' ' + v.t : null;
   }).filter(Boolean);
 }
-async function lerPdf(file){
-  if(!window.pdfjsLib) throw new Error('Biblioteca de leitura de PDF não carregada. Verifique a conexão com a internet.');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
-  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
+/* Monta o texto da fatura a partir dos itens de texto do PDF (uma lista por página). Separado de lerPdf para ser testável. */
+function textoDeItens(paginas){
   let txt = ''; const geo = [];
-  for(let p=1;p<=pdf.numPages;p++){
-    const c = await (await pdf.getPage(p)).getTextContent();
-    geo.push(...historicoGeometrico(c.items));
+  paginas.forEach(items=>{
+    geo.push(...historicoGeometrico(items));
     const rows = [];
-    c.items.forEach(i=>{
+    items.forEach(i=>{
       if(!i.str.trim()) return;
       const y = Math.round(i.transform[5]), x = i.transform[4];
       let row = rows.find(r=>Math.abs(r.y-y)<=2);
@@ -386,8 +402,16 @@ async function lerPdf(file){
       row.it.push({x, t:i.str});
     });
     rows.sort((a,b)=>b.y-a.y).forEach(r=>{ txt += r.it.sort((a,b)=>a.x-b.x).map(i=>i.t).join(' ') + '\n'; });
-  }
+  });
   return (geo.length ? geo.join('\n') + '\n' : '') + txt;
+}
+async function lerPdf(file){
+  if(!window.pdfjsLib) throw new Error('Biblioteca de leitura de PDF não carregada. Verifique a conexão com a internet.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
+  const paginas = [];
+  for(let p=1;p<=pdf.numPages;p++) paginas.push((await (await pdf.getPage(p)).getTextContent()).items);
+  return textoDeItens(paginas);
 }
 $('fatura').addEventListener('change', async e=>{
   const f = e.target.files[0]; if(!f) return;

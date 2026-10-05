@@ -39,3 +39,7 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
 #nav a:hover{color:var(--ink);background:var(--bg)}
 #nav a.ativo{color:var(--acc);background:var(--bg);font-weight:600}
 #nav a:focus-visible{outline:2px solid var(--acc)}
+
+/* versao */
+#nav .versao{margin-left:auto;align-self:center;padding:0 8px;color:var(--mute);font-size:.8rem;white-space:nowrap}
+.rodape{margin-top:24px;text-align:center;color:var(--mute);font-size:.8rem}

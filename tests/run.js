@@ -45,7 +45,7 @@ const rows = (el) => [...el.querySelectorAll('.row')].map(r => [r.children[0].te
 /* ======================= A) ESTÁTICO ======================= */
 async function estatico() {
   section('A) Estrutura, arquivos e boas práticas');
-  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js', 'parametros.js', '.github/workflows/testes.yml', 'js/vendor/pdf.min.js', 'js/vendor/pdf.worker.min.js', 'js/vendor/LICENSE-pdfjs.txt', 'tests/package-lock.json'];
+  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js', 'parametros.js', '.github/workflows/testes.yml', 'js/vendor/pdf.min.js', 'js/vendor/pdf.worker.min.js', 'js/vendor/LICENSE-pdfjs.txt', 'tests/package-lock.json', 'tests/extrair-fixture.js', 'versao.js', 'CHANGELOG.md'];
   files.forEach(f => ok(fs.existsSync(path.join(ROOT, f)), 'arquivo existe: ' + f));
   for (const f of ['config.js', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js']) {
     try { new Function(fs.readFileSync(path.join(ROOT, f), 'utf8')); ok(true, ''); } catch (e) { ok(false, 'sintaxe JS ' + f, e.message); }
@@ -84,6 +84,14 @@ async function estatico() {
   ok(/runs-on|npm ci/.test(fs.readFileSync(path.join(ROOT, '.github/workflows/testes.yml'), 'utf8')), 'workflow de testes presente');
   ok(typeof PARAM.versao === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(PARAM.atualizadoEm) && PARAM.descontoSocial === 200 && PARAM.acs.length === 5, 'parametros.js: versão, data, desconto social e 5 modelos de AC');
   ok(JSON.stringify(Object.keys(PARAM.distribuidoras)) === JSON.stringify(Object.keys(TAB)) && Object.entries(PARAM.distribuidoras).every(([d, t]) => TIPOS.every((k, i) => t[k] === TAB[d][i])), 'parametros.js confere com a tabela do negócio (6 distribuidoras x 3 tipos)');
+  const VER = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(VER);
+  const cl = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8'), mv = cl.match(/^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})/m);
+  ok(/^\d+\.\d+\.\d+$/.test(VER.VERSAO.numero) && /^\d{4}-\d{2}-\d{2}$/.test(VER.VERSAO.data), 'versao.js: número (MAIOR.MENOR.CORREÇÃO) e data válidos');
+  ok(!!mv && mv[1] === VER.VERSAO.numero && mv[2] === VER.VERSAO.data, 'CHANGELOG: versão mais recente confere com versao.js', mv ? mv[1] + ' ' + mv[2] : 'sem entrada');
+  ok(/\[Não lançado\]/.test(cl), 'CHANGELOG: seção "Não lançado" presente');
+  const FX = path.join(ROOT, 'tests/fixtures'); const fxs = fs.readdirSync(FX).filter(n => n.endsWith('.json'));
+  ok(fxs.length >= 7, 'fixtures de faturas reais presentes (' + fxs.length + ')');
+  fxs.forEach(f => { const t = fs.readFileSync(path.join(FX, f), 'utf8'); ok(!/[1-9]\d{7,}/.test(t) && !/\*\*\*/.test(t), 'fixture sem números longos nem CPF mascarado: ' + f); });
   const w = await open('index.html'); ok(typeof w.CONFIG === 'object' && 'goatcounter' in w.CONFIG && 'locationsUrl' in w.CONFIG, 'config.js define CONFIG'); w.close();
 }
 
@@ -310,6 +318,43 @@ async function fatura() {
   w.close();
 }
 
+/* ======================= H) FATURAS REAIS (fixtures anonimizadas) ======================= */
+async function faturasReais() {
+  section('H) Faturas reais (fixtures anonimizadas: PDFs com texto, escaneado e transcrições de fotos)');
+  const dir = path.join(__dirname, 'fixtures'); const w = await open('consumo.html');
+  const itensDe = pgs => pgs.map(a => a.map(([str, x, y, wd]) => ({ str, transform: [1, 0, 0, 1, x, y], width: wd })));
+  const par = r => JSON.stringify(r.meses.map(m => [m.rot, m.v]));
+  for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.json')).sort()) {
+    const fx = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')), e = fx.esperado, id = f.replace('.json', '');
+    const texto = fx.paginas ? w.textoDeItens(itensDe(fx.paginas)) : fx.texto, r = w.analisarFatura(texto);
+    ok(r.dist === e.distribuidora, id + ': distribuidora ' + e.distribuidora, r.dist);
+    ok((r.tipo || null) === e.tipo, id + ': tipo ' + e.tipo, r.tipo);
+    ok(!!r.social === !!e.social, id + ': tarifa social ' + (e.social ? 'detectada' : 'não detectada'));
+    ok((r.atual == null ? null : r.atual) === e.atual, id + ': consumo atual ' + e.atual, r.atual);
+    ok(par(r) === JSON.stringify(e.meses), id + ': histórico (' + e.meses.length + ' meses, Mês 01 = mais recente)', par(r));
+    ok(!!r.grupoA === !!e.grupoA, id + ': grupo A (alta tensão) ' + (e.grupoA ? 'detectado' : 'não'));
+    if (e.avisoContem) ok(new RegExp(e.avisoContem, 'i').test(r.aviso || ''), id + ': aviso "' + e.avisoContem + '"', r.aviso);
+    // aplicação na tela e resultado final
+    base(w); w.aplicarFatura(texto);
+    ok(!$(w, 'social').checked, id + ': tarifa social só avisa (não marca sozinha)');
+    if (e.meses.length) {
+      ok($(w, 'm1').value === String(e.meses[0][1]) && w.document.querySelector('label[for=m1]').textContent === 'Mês 01 (' + e.meses[0][0] + ')', id + ': Mês 01 e rótulo na tela');
+      ok(e.meses.every((m, i) => $(w, 'm' + (i + 1)).value === String(m[1])) && (e.meses.length >= 12 || $(w, 'm' + (e.meses.length + 1)).value === ''), id + ': todos os meses preenchidos e o restante vazio');
+      const media = e.meses.reduce((a, m) => a + m[1], 0) / e.meses.length; ok(Math.abs(num(txt(w, 'considerada')) - media) < 0.011, id + ': média considerada ' + media.toFixed(2), txt(w, 'considerada'));
+      if (e.distribuidora && e.tipo) { const min = TAB[e.distribuidora][TIPOS.indexOf(e.tipo)]; ok(status(w) === (media >= min ? 'ok' : 'no') && num(txt(w, 'minimo')) === min, id + ': veredito contra o mínimo ' + min); }
+    } else ok($(w, 'm1').value === '' && /histórico não encontrado/.test(txt(w, 'impStatus')), id + ': sem histórico: campos vazios e aviso na tela');
+  }
+  // fluxo completo do botão de PDF (pdf.js simulado com os itens reais anonimizados)
+  const stub = (x, pgs) => { x.pdfjsLib = { GlobalWorkerOptions: {}, getDocument: () => ({ promise: Promise.resolve({ numPages: pgs.length, getPage: async n => ({ getTextContent: async () => ({ items: pgs[n - 1] }) }) }) }) }; };
+  const enviar = async x => { const i = $(x, 'fatura'); Object.defineProperty(i, 'files', { value: [{ arrayBuffer: async () => new ArrayBuffer(1) }], configurable: true }); i.dispatchEvent(new x.Event('change', { bubbles: true })); await sleep(200); };
+  const fxPdf = JSON.parse(fs.readFileSync(path.join(dir, 'copel-baixa-renda-mono.json'), 'utf8'));
+  base(w); stub(w, itensDe(fxPdf.paginas)); await enviar(w);
+  ok($(w, 'dist').value === 'COPEL - PR' && $(w, 'tipo').value === 'Monofásico' && $(w, 'm1').value === '332' && $(w, 'm12').value === '343', 'botão de PDF: lê a Copel baixa renda de ponta a ponta');
+  ok(/tarifa social/i.test(txt(w, 'impStatus')) && !$(w, 'social').checked, 'botão de PDF: avisa da tarifa social sem marcar');
+  base(w); stub(w, [[], []]); await enviar(w); ok(/Não encontrei texto no PDF/.test(txt(w, 'impStatus')) && $(w, 'm1').value === '', 'PDF escaneado (CPFL): mensagem clara e nada é preenchido');
+  base(w); delete w.pdfjsLib; await enviar(w); ok(/Não consegui ler a fatura/.test(txt(w, 'impStatus')), 'biblioteca de PDF indisponível: mensagem de erro');
+  w.close();
+}
 /* ======================= F) MENU/HUB, ESTATÍSTICAS E RASTREIO ======================= */
 async function hub() {
   section('F) Menu, navegação, estatísticas e contagem');
@@ -318,6 +363,8 @@ async function hub() {
   const clica = async k => { w.document.querySelector('#nav a[data-k=' + k + ']').click(); await sleep(60); };
   ok(est() === 'inicio* indicacao consumo' && !$(w, 'menu').classList.contains('oculto'), 'início: página principal ativa');
   ok([...w.document.querySelectorAll('#nav a')].map(a => a.textContent).join('|') === 'Página principal|Simulação de indicação|Simulação de consumo de energia', 'barra: os 3 itens pedidos');
+  const VV = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(VV);
+  ok(txt(w, 'versaoNav') === 'v' + VV.VERSAO.numero && txt(w, 'versao').includes('Versão ' + VV.VERSAO.numero), 'versão exibida na barra e no rodapé do menu', txt(w, 'versaoNav') + ' / ' + txt(w, 'versao'));
   await clica('indicacao'); ok(est() === 'inicio indicacao* consumo' && $(w, 'frame').getAttribute('src') === 'indicacao.html' && $(w, 'menu').classList.contains('oculto'), 'ir para indicação');
   await clica('consumo'); ok(est() === 'inicio indicacao consumo*' && $(w, 'frame').getAttribute('src') === 'consumo.html', 'ir para consumo');
   await clica('inicio'); ok(est() === 'inicio* indicacao consumo' && !$(w, 'frame').hasAttribute('src'), 'voltar à página principal libera o iframe');
@@ -369,7 +416,7 @@ async function rastreio() {
 
 (async () => {
   const t0 = Date.now();
-  for (const f of [estatico, indicacao, consumo, consumo2, fatura, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
+  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
   console.log('\n' + '='.repeat(60) + `\nAprovados: ${pass}   Reprovados: ${fail}   Avisos: ${warns.length}   (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('\nFALHAS:'); fails.forEach(f => console.log(' x ' + f)); }
   if (warns.length) { console.log('\nAVISOS:'); [...new Set(warns)].forEach(f => console.log(' ! ' + f)); }

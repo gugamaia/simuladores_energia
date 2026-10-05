@@ -6,6 +6,11 @@ const TOOLS = {
 };
 const $ = id => document.getElementById(id);
 
+/* ---- Versão publicada (versao.js) ---- */
+const VER = window.VERSAO || {numero:'?', data:''};
+$('versaoNav').textContent = 'v' + VER.numero;
+$('versao').textContent = 'Versão ' + VER.numero + (VER.data ? ' (' + VER.data.split('-').reverse().join('/') + ')' : '');
+
 /* ---- GoatCounter (contagem de acessos e simula\u00e7\u00f5es) ---- */
 /* Não contar as próprias visitas: abra o site uma vez com ?contar=nao (e ?contar=sim para voltar a contar) */
 try{

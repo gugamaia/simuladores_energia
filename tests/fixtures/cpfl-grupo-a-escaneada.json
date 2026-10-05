@@ -1,0 +1,15 @@
+{
+ "origem": "CPFL Paulista - grupo A (alta tensão), PDF ESCANEADO sem texto; texto transcrito da imagem",
+ "texto": "CPFL ENERGIA\nCOMPANHIA PAULISTA DE FORCA E LUZ\nClassificação: Tarifa Verde Livre-A4 Comercial Outros Serviços Atividades\nTipo de Fornecimento: Trifásico\nRef: mês/ano MAI/2026 Vencimento 12/06/2026\nConsumo Ponta - [kWh] Nº DIAS FAT\nMAI 26 1178,00 31\nABR 26 1515,00 30\nMAR 26 2111,00 31\nFEV 26 1809,00 28\nJAN 26 1944,00 31\nDEZ 25 2043,00 31\nConsumo Fora de Ponta - [kWh] Nº DIAS FAT\nMAI 26 10557,00 31\nABR 26 13781,00 30\nMAR 26 16173,00 31\nFEV 26 15441,00 28\nJAN 26 17634,00 31\nDEZ 25 16909,00 31\n",
+ "esperado": {
+  "origem": "CPFL Paulista - grupo A (alta tensão), PDF ESCANEADO sem texto; texto transcrito da imagem",
+  "distribuidora": "CPFL Paulista - SP",
+  "tipo": "Trifásico",
+  "social": false,
+  "atual": null,
+  "meses": [],
+  "grupoA": true,
+  "avisoContem": "alta tensão",
+  "nota": "O PDF original não tem texto (só imagem): o site responde que não encontrou texto. Aqui se testa o texto transcrito: o consumo vem separado em ponta e fora de ponta e não deve ser preenchido como histórico."
+ }
+}
