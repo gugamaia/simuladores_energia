@@ -1,13 +1,8 @@
 /* Tabela de parâmetros: edite aqui para incluir/alterar distribuidoras e mínimos. */
-const DEFAULTS = {
-  "CEMIG - MG":       {"Monofásico":153,"Bifásico":173,"Trifásico":223},
-  "COPEL - PR":       {"Monofásico":189,"Bifásico":209,"Trifásico":259},
-  "CPFL Paulista - SP":{"Monofásico":250,"Bifásico":270,"Trifásico":320},
-  "ELEKTRO - SP":     {"Monofásico":250,"Bifásico":270,"Trifásico":320},
-  "ENERGISA - MT":    {"Monofásico":210,"Bifásico":230,"Trifásico":280},
-  "EQUATORIAL - GO":  {"Monofásico":156,"Bifásico":176,"Trifásico":226}
-};
-const DESCONTO_SOCIAL = 200;
+/* Parâmetros vêm de parametros.js (fonte única). */
+const P = window.PARAMETROS || {versao:'indisponivel', atualizadoEm:'', descontoSocial:200, acs:[], distribuidoras:{}};
+const DEFAULTS = P.distribuidoras;
+const DESCONTO_SOCIAL = Number.isFinite(P.descontoSocial) ? P.descontoSocial : 200;
 const TIPOS = ["Monofásico","Bifásico","Trifásico"];
 /* Valida o que veio do armazenamento do navegador: formato inválido volta aos padrões */
 function sanear(p){
@@ -20,10 +15,17 @@ function sanear(p){
   });
   return Object.keys(out).length ? out : null;
 }
-const KEY = 'validador-lead-params-v1';
+const KEY = 'validador-lead-params-v2', ACKEY = 'validador-lead-ac-v2';
 let PARAMS = JSON.parse(JSON.stringify(DEFAULTS));
-try{ const sv = localStorage.getItem(KEY); const p = sv ? sanear(JSON.parse(sv)) : null; if(p) PARAMS = p; }catch(e){}
-function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify(PARAMS)); }catch(e){} }
+let RASCUNHO_DESCARTADO = false;   // ajustes locais de uma versão antiga da tabela
+try{
+  const sv = localStorage.getItem(KEY);
+  if(sv){
+    const o = JSON.parse(sv), p = (o && o.versao === P.versao) ? sanear(o.params) : null;
+    if(p) PARAMS = p; else { RASCUNHO_DESCARTADO = true; localStorage.removeItem(KEY); }
+  } else if(localStorage.getItem('validador-lead-params-v1')){ RASCUNHO_DESCARTADO = true; localStorage.removeItem('validador-lead-params-v1'); }
+}catch(e){}
+function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify({versao:P.versao, params:PARAMS})); }catch(e){} }
 const esc = t => String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 const $ = id => document.getElementById(id);
@@ -64,8 +66,36 @@ $('add').addEventListener('click',()=>{
   refresh();
 });
 $('restaurar').addEventListener('click',()=>{
-  if(confirm('Restaurar os parâmetros originais? As alterações serão perdidas.')){ PARAMS=JSON.parse(JSON.stringify(DEFAULTS)); refresh(); }
+  if(confirm('Restaurar os parâmetros da tabela vigente? Os ajustes locais serão perdidos.')){
+    PARAMS = JSON.parse(JSON.stringify(DEFAULTS));
+    AC = JSON.parse(JSON.stringify(AC_DEFAULT));
+    try{ localStorage.removeItem(ACKEY); }catch(e){}
+    document.querySelectorAll('.ack').forEach((k,i)=>{ if(AC[i]) k.value = AC[i].kwh; });
+    RASCUNHO_DESCARTADO = false; refresh();
+  }
 });
+/* Exporta a tabela atual como parametros.js (já com nova versão) para publicar no repositório */
+$('exportar').addEventListener('click',()=>{
+  const agora = new Date();
+  const dados = {
+    versao: agora.toISOString().slice(0,16).replace(/[-:T]/g,''),
+    atualizadoEm: agora.toLocaleDateString('pt-BR'),
+    descontoSocial: DESCONTO_SOCIAL, acs: AC, distribuidoras: PARAMS
+  };
+  const conteudo = '/* Gerado pelo simulador em ' + agora.toLocaleString('pt-BR') + '. Substitua o parametros.js do repositório por este arquivo. */\nwindow.PARAMETROS = ' + JSON.stringify(dados,null,2) + ';\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([conteudo],{type:'text/javascript'}));
+  a.download = 'parametros.js'; document.body.appendChild(a); a.click(); a.remove();
+});
+function infoParametros(){
+  const mudou = JSON.stringify(PARAMS) !== JSON.stringify(DEFAULTS) || JSON.stringify(AC) !== JSON.stringify(AC_DEFAULT);
+  $('paramInfo').textContent = 'Tabela vigente: versão ' + P.versao + (P.atualizadoEm ? ' (atualizada em ' + P.atualizadoEm + ')' : '') + '.'
+    + (!Object.keys(DEFAULTS).length ? ' ATENÇÃO: o arquivo parametros.js não foi carregado.' : '')
+    + (mudou ? ' Há ajustes locais ainda não publicados: use "Exportar parametros.js".' : '')
+    + (RASCUNHO_DESCARTADO ? ' Seus ajustes locais antigos foram descartados porque a tabela foi atualizada.' : '');
+  const sm = document.querySelector('#social').closest('label').querySelector('small');
+  if(sm) sm.textContent = 'Desconta ' + DESCONTO_SOCIAL + ' kWh da média antes de comparar com o mínimo.';
+}
 renderDist(); renderParams();
 
 function calc(){
@@ -84,7 +114,7 @@ function calc(){
   const minimo = (dist && tipo && PARAMS[dist] && Number.isFinite(PARAMS[dist][tipo])) ? PARAMS[dist][tipo] : null;
 
   $('qtd').textContent = qtd + (EXCL.size ? ` (${EXCL.size} desconsiderado${EXCL.size>1?'s':''})` : '');
-  checarVariacao();
+  infoParametros();
   $('total').textContent = qtd ? fmt(vals.reduce((a,b)=>a+b,0)) : '–';
   $('relogio').textContent = tipo || '–';
   $('media').textContent = media===null ? '–' : fmt(media);
@@ -131,11 +161,13 @@ function calc(){
   }
 }
 /* Ar-condicionado: consumo extra por aparelho (kWh/mês), editável */
-const AC_DEFAULT = [{btu:9000,kwh:100},{btu:12000,kwh:150},{btu:18000,kwh:250},{btu:20000,kwh:300},{btu:24000,kwh:400}];
-const ACKEY = 'validador-lead-ac-v1';
+const AC_DEFAULT = Array.isArray(P.acs) ? P.acs : [];
 let AC = JSON.parse(JSON.stringify(AC_DEFAULT));
-try{ const sa = localStorage.getItem(ACKEY); const a = sa ? JSON.parse(sa) : null;
-  if(Array.isArray(a) && a.length && a.every(x=>x && Number.isFinite(x.btu) && Number.isFinite(x.kwh) && x.kwh >= 0)) AC = a; }catch(e){}
+try{
+  const sa = localStorage.getItem(ACKEY), o = sa ? JSON.parse(sa) : null, a = o && o.versao === P.versao ? o.acs : null;
+  if(Array.isArray(a) && a.length === AC_DEFAULT.length && a.every((x,i)=>x && x.btu === AC_DEFAULT[i].btu && Number.isFinite(x.kwh) && x.kwh >= 0)) AC = a;
+  else if(sa){ RASCUNHO_DESCARTADO = true; localStorage.removeItem(ACKEY); }
+}catch(e){}
 function renderAC(){
   $('acs').innerHTML = AC.map((a,i)=>
     `<div class="acrow"><span>${a.btu.toLocaleString('pt-BR')} BTUs</span>` +
@@ -155,31 +187,11 @@ $('acs').addEventListener('input',e=>{
   const i = e.target;
   if(i.classList.contains('ack')){
     const v = parseFloat(i.value);
-    if(!isNaN(v) && v>=0){ AC[i.dataset.i].kwh = v; try{ localStorage.setItem(ACKEY, JSON.stringify(AC)); }catch(err){} }
+    if(!isNaN(v) && v>=0){ AC[i.dataset.i].kwh = v; try{ localStorage.setItem(ACKEY, JSON.stringify({versao:P.versao, acs:AC})); }catch(err){} }
   }
   calc();
 });
 /* Alerta de meses fora do padrão (mínimo de 3 meses informados) */
-function checarVariacao(){
-  const lim = parseFloat($('lim').value), el = $('alerta');
-  const itens = [...document.querySelectorAll('.mes')]
-    .map((inp,i)=>({inp,i,v:inp.value.trim()===''?NaN:Number(inp.value)}))
-    .filter(x=>!isNaN(x.v) && x.v>=0);
-  itens.forEach(x=>x.inp.classList.remove('out'));
-  el.innerHTML = '';
-  if(itens.length<3 || !(lim>0)) return;
-  const m = itens.reduce((a,x)=>a+x.v,0)/itens.length;
-  if(!(m>0)) return;
-  const fora = itens.filter(x=>Math.abs(x.v-m)/m*100 > lim);
-  if(!fora.length) return;
-  fora.forEach(x=>x.inp.classList.add('out'));
-  const li = fora.map(x=>{
-    const pct = Math.round(Math.abs(x.v-m)/m*100), dir = x.v>m ? 'acima' : 'abaixo';
-    return `<li><b>Mês ${String(x.i+1).padStart(2,'0')}</b>: ${fmt(x.v)} kWh (${pct}% ${dir} da média de ${fmt(m)})</li>`;
-  }).join('');
-  el.innerHTML = `<div class="alerta"><b>Atenção: ${fora.length>1?'meses fora do padrão':'mês fora do padrão'}</b><ul>${li}</ul>Confirme com o lead se ${fora.length>1?'esses meses devem':'esse mês deve'} entrar na média. Se não, apague o valor para recalcular.</div>`;
-}
-
 /* Alerta de meses fora do padrão */
 let EXCL = new Set();
 function renderAlertas(outliers, mediaTodos){
@@ -359,7 +371,7 @@ function historicoGeometrico(items){
 }
 async function lerPdf(file){
   if(!window.pdfjsLib) throw new Error('Biblioteca de leitura de PDF não carregada. Verifique a conexão com a internet.');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
   const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
   let txt = ''; const geo = [];
   for(let p=1;p<=pdf.numPages;p++){
@@ -389,8 +401,6 @@ $('fatura').addEventListener('change', async e=>{
 });
 $('reanalisar').addEventListener('click',()=>{ if($('impTexto').value.trim()) aplicarFatura($('impTexto').value); });
 /* os dois campos de limite (resultado e configuração) andam juntos */
-$('lim').addEventListener('input',()=>{ $('limiar').value = $('lim').value; });
-$('limiar').addEventListener('input',()=>{ $('lim').value = $('limiar').value; });
 document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',calc));
 $('limpar').addEventListener('click',()=>{document.querySelectorAll('.mes,.acq').forEach(i=>i.value='');OUTROS=[];renderOutros();$('gPossui').checked=false;$('gCarteira').checked=false;$('gKwh').value='';$('gSaldo').value='';toggleGeracao();});
 calc();

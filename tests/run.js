@@ -10,6 +10,8 @@ const num = s => { if (s == null) return NaN; return parseFloat(String(s).replac
 let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
 const section = n => console.log('\n== ' + n);
+const PARAM = (() => { const o = {}; new Function('window', fs.readFileSync(path.join(__dirname, '..', 'parametros.js'), 'utf8'))(o); return o.PARAMETROS; })();
+const KP = 'validador-lead-params-v2', KA = 'validador-lead-ac-v2';
 
 class Loader extends ResourceLoader {
   constructor(over) { super(); this.over = over || {}; }
@@ -17,6 +19,7 @@ class Loader extends ResourceLoader {
     if (url.startsWith('http://localhost/')) {
       const rel = url.slice(17).split(/[?#]/)[0] || 'index.html';
       if (this.over[rel] !== undefined) return Promise.resolve(Buffer.from(this.over[rel]));
+      if (rel.startsWith('js/vendor/')) return Promise.resolve(Buffer.from('/* biblioteca omitida nos testes */'));
       const p = path.join(ROOT, rel);
       return fs.existsSync(p) ? Promise.resolve(fs.readFileSync(p)) : Promise.reject(new Error('404 ' + rel));
     }
@@ -27,7 +30,7 @@ async function open(page, o = {}) {
   const errors = []; const vc = new VirtualConsole();
   vc.on('jsdomError', e => errors.push(String(e.message).split('\n')[0]));
   const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
-  const dom = new JSDOM(html, { url: 'http://localhost/' + page + (o.hash || ''), runScripts: 'dangerously', resources: new Loader(o.over), pretendToBeVisual: true, virtualConsole: vc,
+  const dom = new JSDOM(html, { url: 'http://localhost/' + page + (o.query || '') + (o.hash || ''), runScripts: 'dangerously', resources: new Loader(o.over), pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) { w.confirm = () => true; w.alert = () => { w.__alerts = (w.__alerts || 0) + 1; }; w.scrollTo = () => {}; if (o.beforeParse) o.beforeParse(w); } });
   await new Promise(r => dom.window.addEventListener('load', r)); await sleep(40);
   dom.window.__errors = errors; return dom.window;
@@ -42,7 +45,7 @@ const rows = (el) => [...el.querySelectorAll('.row')].map(r => [r.children[0].te
 /* ======================= A) ESTÁTICO ======================= */
 async function estatico() {
   section('A) Estrutura, arquivos e boas práticas');
-  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js'];
+  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js', 'parametros.js', '.github/workflows/testes.yml', 'js/vendor/pdf.min.js', 'js/vendor/pdf.worker.min.js', 'js/vendor/LICENSE-pdfjs.txt', 'tests/package-lock.json'];
   files.forEach(f => ok(fs.existsSync(path.join(ROOT, f)), 'arquivo existe: ' + f));
   for (const f of ['config.js', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js']) {
     try { new Function(fs.readFileSync(path.join(ROOT, f), 'utf8')); ok(true, ''); } catch (e) { ok(false, 'sintaxe JS ' + f, e.message); }
@@ -76,6 +79,11 @@ async function estatico() {
   const gi = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
   ['.env', '.dev.vars', 'node_modules/', '*.pdf', '*.zip'].forEach(p => ok(gi.split('\n').includes(p), '.gitignore contém ' + p));
   ok(!gi.split('\n').includes('config.js') && !gi.split('\n').includes('css/') && !gi.split('\n').includes('js/'), '.gitignore não exclui arquivos do site');
+  ok(fs.statSync(path.join(ROOT, 'js/vendor/pdf.min.js')).size > 100000 && fs.statSync(path.join(ROOT, 'js/vendor/pdf.worker.min.js')).size > 500000, 'pdf.js local tem tamanho esperado');
+  ok(!/cdnjs\.cloudflare/.test(fs.readFileSync(path.join(ROOT, 'consumo.html'), 'utf8') + fs.readFileSync(path.join(ROOT, 'js/consumo.js'), 'utf8')), 'leitor de PDF não depende de CDN');
+  ok(/runs-on|npm ci/.test(fs.readFileSync(path.join(ROOT, '.github/workflows/testes.yml'), 'utf8')), 'workflow de testes presente');
+  ok(typeof PARAM.versao === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(PARAM.atualizadoEm) && PARAM.descontoSocial === 200 && PARAM.acs.length === 5, 'parametros.js: versão, data, desconto social e 5 modelos de AC');
+  ok(JSON.stringify(Object.keys(PARAM.distribuidoras)) === JSON.stringify(Object.keys(TAB)) && Object.entries(PARAM.distribuidoras).every(([d, t]) => TIPOS.every((k, i) => t[k] === TAB[d][i])), 'parametros.js confere com a tabela do negócio (6 distribuidoras x 3 tipos)');
   const w = await open('index.html'); ok(typeof w.CONFIG === 'object' && 'goatcounter' in w.CONFIG && 'locationsUrl' in w.CONFIG, 'config.js define CONFIG'); w.close();
 }
 
@@ -194,8 +202,9 @@ async function consumo() {
 
 /* ======================= D) ALERTAS, PARÂMETROS, SEGURANÇA ======================= */
 async function consumo2() {
-  section('D) Consumo: alertas, parâmetros editáveis, persistência e segurança');
+  section('D) Consumo: alertas, parâmetros (arquivo + ajustes locais), persistência e segurança');
   let w = await open('consumo.html');
+  ok(!$(w, 'lim') && !$(w, 'alerta') && !!$(w, 'alertBox') && w.document.querySelectorAll('[id^=alert],#limiar').length === 3, 'alerta de variação unificado (uma caixa e um campo de limite)');
   base(w); meses(w, [100, 100, 100, 100, 300]);
   ok(!$(w, 'alertBox').hidden && $(w, 'alertList').querySelectorAll('input').length === 1, 'alerta: 1 mês fora do padrão (300 vs média 140)');
   ok(w.document.querySelectorAll('.mes')[4].classList.contains('out'), 'mês fora do padrão destacado');
@@ -204,31 +213,56 @@ async function consumo2() {
   meses(w, [100, 100, 100, 100, 110]); ok($(w, 'alertBox').hidden, 'ao corrigir o valor o alerta some e a exclusão é limpa'); ok(num(txt(w, 'media')) === 102 && txt(w, 'qtd') === '5', 'exclusão não persiste quando o mês deixa de ser outlier', txt(w, 'media'));
   meses(w, [100, 100]); ok($(w, 'alertBox').hidden, 'alerta exige ao menos 3 meses');
   meses(w, [0, 0, 0, 0]); ok($(w, 'alertBox').hidden && !/NaN/.test(txt(w, 'media')), 'média 0 não gera alerta nem NaN');
-  meses(w, [100, 100, 100, 100, 300]); setv(w, 'limiar', 200); ok($(w, 'alertBox').hidden, 'limite de 200% não alerta');
-  setv(w, 'limiar', 30); setv(w, 'lim', 60); ok($(w, 'limiar').value === '60', 'os dois campos de limite ficam sincronizados', 'limiar=' + $(w, 'limiar').value);
-  ok(!(!$(w, 'alertBox').hidden && !w.document.querySelector('#alerta .alerta')) && !(($(w, 'alertBox').hidden) && w.document.querySelector('#alerta .alerta')), 'as duas caixas de alerta concordam entre si');
-  // parâmetros
+  meses(w, [100, 100, 100, 100, 300]); setv(w, 'limiar', 200); ok($(w, 'alertBox').hidden, 'limite de 200% não alerta'); setv(w, 'limiar', 30);
+  // parâmetros vindos do arquivo
+  ok(/versão 2026-10-05/.test(txt(w, 'paramInfo')) && !/ajustes locais/.test(txt(w, 'paramInfo')), 'mostra a versão vigente da tabela, sem ajustes locais');
+  ok(w.document.querySelectorAll('#params tr').length === 6 && $(w, 'dist').options.length === 7, 'tabela carregada de parametros.js (6 distribuidoras)');
+  ok(/Desconta 200 kWh/.test($(w, 'social').closest('label').querySelector('small').textContent), 'texto do desconto social vem do arquivo');
+  // edição local
   base(w, 'CEMIG - MG', 'Monofásico'); meses(w, [150, 150, 150]); ok(status(w) === 'no', 'CEMIG mono 150 < 153: não atende');
   const inp = w.document.querySelector('#params tr[data-d="CEMIG - MG"] input[data-k="Monofásico"]'); inp.value = 140; inp.dispatchEvent(new w.Event('input', { bubbles: true }));
   ok(status(w) === 'ok' && num(txt(w, 'minimo')) === 140, 'editar mínimo muda o veredito na hora');
+  ok(/ajustes locais ainda não publicados/.test(txt(w, 'paramInfo')), 'aviso de ajustes locais não publicados');
   inp.value = ''; inp.dispatchEvent(new w.Event('input', { bubbles: true })); ok(num(txt(w, 'minimo')) === 140, 'valor vazio na tabela não corrompe o mínimo');
-  ok(JSON.parse(w.localStorage.getItem('validador-lead-params-v1'))['CEMIG - MG']['Monofásico'] === 140, 'alteração é salva no navegador');
+  const salvo = JSON.parse(w.localStorage.getItem(KP)); ok(salvo.versao === PARAM.versao && salvo.params['CEMIG - MG']['Monofásico'] === 140, 'ajuste salvo no navegador junto com a versão da tabela');
+  const k0 = w.document.querySelector('.ack'); k0.value = 120; k0.dispatchEvent(new w.Event('input', { bubbles: true })); ok(JSON.parse(w.localStorage.getItem(KA)).acs[0].kwh === 120, 'consumo extra do AC salvo com a versão');
+  // exportar
+  w.URL.createObjectURL = b => { w.__blob = b; return 'blob:teste'; }; w.HTMLAnchorElement.prototype.click = function () { w.__baixou = this.download; };
+  $(w, 'exportar').click(); const conteudo = await new Promise(r => { const fr = new w.FileReader(); fr.onload = () => r(fr.result); fr.readAsText(w.__blob); });
+  const o = {}; new Function('window', conteudo)(o); const E = o.PARAMETROS;
+  ok(w.__baixou === 'parametros.js' && E.distribuidoras['CEMIG - MG']['Monofásico'] === 140 && E.acs[0].kwh === 120 && E.descontoSocial === 200, 'exportar gera parametros.js válido com os ajustes');
+  ok(E.versao !== PARAM.versao && /^\d{2}\/\d{2}\/\d{4}$/.test(E.atualizadoEm), 'exportar gera nova versão e data', E.versao);
+  // cadastro e remoção
   setv(w, 'nNome', 'CELESC - SC'); setv(w, 'nMono', 100); setv(w, 'nBi', 120); setv(w, 'nTri', 160); $(w, 'add').click();
   ok([...$(w, 'dist').options].some(o => o.value === 'CELESC - SC'), 'nova distribuidora aparece na lista'); setv(w, 'dist', 'CELESC - SC'); setv(w, 'tipo', 'Trifásico'); ok(num(txt(w, 'minimo')) === 160, 'nova distribuidora funciona (mínimo 160)');
   const a = w.__alerts || 0; setv(w, 'nNome', ''); $(w, 'add').click(); ok((w.__alerts || 0) === a + 1, 'cadastro sem nome é recusado');
   w.document.querySelector('#params tr[data-d="CELESC - SC"] [data-del]').click(); ok(![...$(w, 'dist').options].some(o => o.value === 'CELESC - SC') && $(w, 'dist').value === '', 'remover distribuidora selecionada limpa a seleção'); ok(/FALTA CONFIGURAR/.test(txt(w, 'status')), 'sem distribuidora volta a "falta configurar"');
-  $(w, 'restaurar').click(); ok(w.eval('PARAMS["CEMIG - MG"]["Monofásico"]') === 153, 'restaurar volta aos valores originais');
+  $(w, 'restaurar').click(); ok(w.eval('PARAMS["CEMIG - MG"]["Monofásico"]') === 153 && w.document.querySelector('.ack').value === '100', 'restaurar volta à tabela vigente (parâmetros e consumo dos AC)');
+  ok(!/ajustes locais/.test(txt(w, 'paramInfo')) && !w.localStorage.getItem(KA), 'após restaurar não há ajustes locais'); w.close();
   // persistência entre aberturas
-  w.close(); w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', JSON.stringify({ 'XPTO - ZZ': { 'Monofásico': 111, 'Bifásico': 222, 'Trifásico': 333 } })); } });
-  ok([...$(w, 'dist').options].some(o => o.value === 'XPTO - ZZ'), 'parâmetros salvos são carregados na abertura'); w.close();
-  // dados corrompidos no localStorage
-  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', '{quebrado'); x.localStorage.setItem('validador-lead-ac-v1', '{quebrado'); } });
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: { 'XPTO - ZZ': { 'Monofásico': 111, 'Bifásico': 222, 'Trifásico': 333 } } })); } });
+  ok([...$(w, 'dist').options].some(o => o.value === 'XPTO - ZZ') && /ajustes locais/.test(txt(w, 'paramInfo')), 'ajustes locais da mesma versão são carregados'); w.close();
+  // tabela atualizada no repositório: rascunho antigo é descartado com aviso
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, JSON.stringify({ versao: 'antiga', params: { 'XPTO - ZZ': { 'Monofásico': 1, 'Bifásico': 2, 'Trifásico': 3 } } })); x.localStorage.setItem(KA, JSON.stringify({ versao: 'antiga', acs: PARAM.acs })); } });
+  ok(![...$(w, 'dist').options].some(o => o.value === 'XPTO - ZZ') && /descartados/.test(txt(w, 'paramInfo')) && !w.localStorage.getItem(KP), 'versão nova da tabela descarta ajustes locais antigos e avisa'); w.close();
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', JSON.stringify({ 'XPTO - ZZ': { 'Monofásico': 1, 'Bifásico': 2, 'Trifásico': 3 } })); } });
+  ok(!w.__errors.length && /descartados/.test(txt(w, 'paramInfo')) && $(w, 'dist').options.length === 7, 'formato legado (v1) é descartado com aviso'); w.close();
+  // tabela publicada diferente (simula uma nova versão no repositório)
+  const novo = "window.PARAMETROS=" + JSON.stringify({ ...PARAM, versao: '2099-01-01', atualizadoEm: '01/01/2099', descontoSocial: 300, acs: PARAM.acs.map((x, i) => i === 0 ? { ...x, kwh: 111 } : x), distribuidoras: { ...PARAM.distribuidoras, 'COPEL - PR': { 'Monofásico': 1, 'Bifásico': 2, 'Trifásico': 3 } } }) + ";";
+  w = await open('consumo.html', { over: { 'parametros.js': novo } });
+  ok(/versão 2099-01-01/.test(txt(w, 'paramInfo')) && w.eval('PARAMS["COPEL - PR"]["Bifásico"]') === 2, 'nova versão do arquivo é usada pelo simulador');
+  ok(w.document.querySelector('.ack').value === '111', 'consumo extra do AC vem do arquivo'); ok(/Desconta 300 kWh/.test($(w, 'social').closest('label').querySelector('small').textContent), 'desconto social configurável pelo arquivo (texto)');
+  base(w); meses(w, [500, 500, 500]); chk(w, 'social', true); ok(num(txt(w, 'considerada')) === 200, 'desconto social configurável pelo arquivo (cálculo: 500 - 300)', txt(w, 'considerada')); w.close();
+  // arquivo de parâmetros ausente
+  w = await open('consumo.html', { over: { 'parametros.js': '' } });
+  ok(!w.__errors.length && /não foi carregado/.test(txt(w, 'paramInfo')), 'sem parametros.js: avisa e não quebra', w.__errors.join('|')); w.close();
+  // dados corrompidos
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, '{quebrado'); x.localStorage.setItem(KA, '{quebrado'); } });
   ok(!w.__errors.length && $(w, 'dist').options.length === 7, 'JSON inválido no armazenamento: usa os padrões e não quebra', w.__errors.join('|')); w.close();
-  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-ac-v1', '[1,null]'); } });
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KA, JSON.stringify({ versao: PARAM.versao, acs: [1, null] })); } });
   ok(!w.__errors.length && w.document.querySelectorAll('.acq').length === 5, 'AC salvo com formato errado não derruba a página', w.__errors.join('|')); w.close();
-  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', JSON.stringify({ 'A - B': {} })); } });
-  base(w, 'A - B', 'Bifásico'); meses(w, [300, 300, 300]); ok(!/NaN|undefined/.test(txt(w, 'considerada') + txt(w, 'minimo') + txt(w, 'dif')), 'parâmetro incompleto no armazenamento não gera NaN', txt(w, 'considerada') + '/' + txt(w, 'minimo')); w.close();
-  // sem localStorage (ex.: arquivo aberto direto, navegação privada)
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: { 'A - B': {} } })); } });
+  base(w, 'A - B', 'Bifásico'); meses(w, [300, 300, 300]); ok(!/NaN|undefined/.test(txt(w, 'considerada') + txt(w, 'minimo') + txt(w, 'dif')), 'parâmetro incompleto no armazenamento não gera NaN'); w.close();
   w = await open('consumo.html', { beforeParse(x) { Object.defineProperty(x, 'localStorage', { get() { throw new Error('SecurityError'); } }); } });
   ok(!w.__errors.length, 'sem acesso ao localStorage a página funciona', w.__errors.join('|')); w.close();
   // XSS
@@ -307,6 +341,10 @@ async function hub() {
   ok(calls.length === 1 && calls[0].path === '/simulacao-indicacao' && calls[0].event === true, 'mensagem do iframe registra evento /simulacao-indicacao', JSON.stringify(calls));
   w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'simulacao', ferramenta: 'inexistente' }, source: src })); await sleep(700); ok(calls.length === 1, 'ferramenta desconhecida é ignorada');
   w.close();
+  // não contar as próprias visitas
+  w = await open('index.html', { query: '?contar=nao', over: { 'config.js': "window.CONFIG={goatcounter:'teste'};" }, beforeParse(x) { x.fetch = mock; } });
+  ok(w.localStorage.getItem('skipgc') === 't', '?contar=nao liga a opção de não contar visitas'); await sleep(1900); ok(/não estão sendo contadas/.test(txt(w, 'stats')), 'painel avisa que as visitas deste navegador não são contadas'); w.close();
+  w = await open('index.html', { query: '?contar=sim', beforeParse(x) { x.localStorage.setItem('skipgc', 't'); } }); ok(w.localStorage.getItem('skipgc') === null, '?contar=sim volta a contar'); w.close();
   // falha do contador não quebra o menu
   w = await open('index.html', { over: { 'config.js': "window.CONFIG={goatcounter:'falha',locationsUrl:'https://worker.test/falha'};" }, beforeParse(x) { x.fetch = mock; } });
   await sleep(1900); ok(!w.__errors.length && txt(w, 'kAcessos') === '-', 'falha na rede: mostra "-" sem erro de script', w.__errors.join('|') + txt(w, 'kAcessos')); ok(/Não foi possível/.test(txt(w, 'top5')), 'falha no Top 5: mensagem amigável'); w.close();

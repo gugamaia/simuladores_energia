@@ -7,6 +7,12 @@ const TOOLS = {
 const $ = id => document.getElementById(id);
 
 /* ---- GoatCounter (contagem de acessos e simula\u00e7\u00f5es) ---- */
+/* Não contar as próprias visitas: abra o site uma vez com ?contar=nao (e ?contar=sim para voltar a contar) */
+try{
+  if(/[?&]contar=nao\b/.test(location.search)) localStorage.setItem('skipgc','t');
+  if(/[?&]contar=sim\b/.test(location.search)) localStorage.removeItem('skipgc');
+}catch(e){}
+const NAO_CONTAR = (()=>{ try{ return localStorage.getItem('skipgc') === 't'; }catch(e){ return false; } })();
 if(GC){
   const s = document.createElement('script');
   s.async = true; s.src = '//gc.zgo.at/count.js';
@@ -34,6 +40,7 @@ const jget = u => fetch(u).then(r=>{ if(!r.ok) throw new Error(r.status); return
 async function painel(){
   if(!GC) return;
   $('stats').hidden = false;
+  if(NAO_CONTAR) document.querySelector('#stats .priv').textContent += ' Suas visitas não estão sendo contadas neste navegador.';
   const base = 'https://'+GC+'.goatcounter.com/counter/';
   const get = p => jget(base+encodeURIComponent(p)+'.json').then(j=>num(j.count)).catch(()=>null);
   const [ac, si, sc] = await Promise.all([get(location.pathname||'/'), get('/simulacao-indicacao'), get('/simulacao-consumo')]);

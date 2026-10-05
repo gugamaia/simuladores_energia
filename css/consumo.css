@@ -58,8 +58,6 @@ input[type=file]{width:100%}
 .badge{font-weight:400;color:var(--mute);margin-left:6px}
 .achead{color:var(--mute);font-size:.8rem;font-weight:600}
 .mes.out{border:2px solid var(--warn);background:var(--warnbg)}
-.alerta{background:var(--warnbg);border-left:4px solid var(--warn);border-radius:6px;padding:10px 12px;margin-top:12px;font-size:.88rem}
-.alerta ul{margin:6px 0;padding-left:20px}
 .x{border:0;background:transparent;color:var(--no);font-size:1.2rem;cursor:pointer}
 
 /* utilitarios */

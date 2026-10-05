@@ -97,7 +97,6 @@
         <div class="row"><span>Saldo na carteira de energia (kWh)</span><b id="carteira">–</b></div>
         <div class="row"><span>Previsão de duração da carteira</span><b id="carteiraPrev">–</b></div>
         <div class="status warn" id="status">FALTA CONFIGURAR<small>Selecione a distribuidora, o tipo e informe ao menos um mês.</small></div>
-        <div id="alerta"></div>
         <div class="alert" id="alertBox" hidden>
           <b>⚠ Atenção: consumo fora do padrão</b>
           <p class="legend">Confirme com o lead se estes meses devem entrar na média. Marque para desconsiderar.</p>
@@ -109,7 +108,8 @@
       <div class="card">
         <details open>
           <summary>Parâmetros de atendimento (editáveis)</summary>
-          <p class="legend">Altere os mínimos (kWh) quando houver mudança. As alterações ficam salvas neste navegador.</p>
+          <p class="legend">Os valores vêm do arquivo <code>parametros.js</code> do repositório. Ajustes feitos aqui ficam só neste navegador até serem exportados e publicados.</p>
+          <p class="legend" id="paramInfo"></p>
           <div class="scroll"><table><thead><tr><th>Distribuidora</th><th>Mono</th><th>Bi</th><th>Tri</th><th></th></tr></thead><tbody id="params"></tbody></table></div>
           <h2 class="mt-14">Adicionar / atualizar distribuidora</h2>
           <div class="addrow">
@@ -120,20 +120,15 @@
           </div>
           <button class="btn" id="add" type="button">Salvar distribuidora</button>
           <button class="btn" id="restaurar" type="button">Restaurar valores originais</button>
+          <button class="btn" id="exportar" type="button">Exportar parametros.js</button>
         </details>
       </div>
     </section>
   </div>
-  <div class="card">
-    <details>
-      <summary>Configuração do alerta de variação</summary>
-      <label for="lim">Alertar quando um mês variar mais de (%) em relação à média</label>
-      <input type="number" id="lim" min="1" step="1" value="30">
-    </details>
-  </div>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="js/vendor/pdf.min.js"></script>
+<script src="parametros.js"></script>
 <script src="js/consumo.js"></script>
 <script src="js/rastreio.js" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
 </body>
