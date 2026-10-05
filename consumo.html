@@ -16,7 +16,7 @@
       <details open>
         <summary>Importar fatura da distribuidora</summary>
         <p class="legend">Envie a fatura em PDF (com texto selecionável) para preencher os campos automaticamente. O arquivo é lido no seu navegador, sem envio a servidores. Revise os dados preenchidos.</p>
-        <input type="file" id="fatura" accept="application/pdf,.pdf">
+        <input type="file" id="fatura" aria-label="Fatura da distribuidora em PDF" accept="application/pdf,.pdf">
         <div id="impStatus" class="note" hidden></div>
         <details class="sub">
           <summary>Texto extraído (conferência / colar manualmente)</summary>
@@ -103,7 +103,7 @@
           <p class="legend">Confirme com o lead se estes meses devem entrar na média. Marque para desconsiderar.</p>
           <div id="alertList"></div>
         </div>
-        <div class="thr">Alertar quando um mês variar mais de <input type="number" id="limiar" min="1" max="500" value="30"> % da média</div>
+        <div class="thr">Alertar quando um mês variar mais de <input type="number" id="limiar" aria-label="Limite de variação em porcentagem" min="1" max="500" value="30"> % da média</div>
         <p class="legend">Verde: média dentro da faixa · Vermelho: média fora da faixa · Laranja: falta configurar/selecionar.</p>
       </div>
       <div class="card">

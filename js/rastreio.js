@@ -16,7 +16,7 @@
     clearTimeout(t);
     t=setTimeout(function(){
       if(!document.querySelector(cfg.valido)) return;
-      var snap=alvo.innerText; if(snap===ultimo) return; ultimo=snap;
+      var snap=alvo.textContent; if(snap===ultimo) return; ultimo=snap;
       window.parent.postMessage({tipo:'simulacao',ferramenta:cfg.ferramenta},'*');
     },4000);
   }).observe(alvo,{childList:true,subtree:true,characterData:true,attributes:true});

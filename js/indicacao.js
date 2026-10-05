@@ -10,6 +10,9 @@ function calc(){
   if(!(fInd>0) || !(fInv>0) || isNaN(pInv) || isNaN(pInd)){
     out.innerHTML = '<p class="empty">Preencha as duas faturas para simular.</p>'; return;
   }
+  if(pInv<0 || pInv>100 || pInd<0 || pInd>100){
+    out.innerHTML = '<p class="empty">Informe percentuais entre 0 e 100.</p>'; return;
+  }
   const descInv = r2(fInv * pInv/100);
   const pagaInv = r2(fInv - descInv);
   const credito = r2(descInv * pInd/100);

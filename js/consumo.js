@@ -9,9 +9,20 @@ const DEFAULTS = {
 };
 const DESCONTO_SOCIAL = 200;
 const TIPOS = ["Monofásico","Bifásico","Trifásico"];
+/* Valida o que veio do armazenamento do navegador: formato inválido volta aos padrões */
+function sanear(p){
+  if(!p || typeof p !== 'object' || Array.isArray(p)) return null;
+  const out = {};
+  Object.keys(p).forEach(d=>{
+    const t = p[d];
+    if(t && typeof t === 'object' && TIPOS.every(k=>Number.isFinite(t[k]) && t[k] >= 0))
+      out[d] = {"Monofásico":t["Monofásico"],"Bifásico":t["Bifásico"],"Trifásico":t["Trifásico"]};
+  });
+  return Object.keys(out).length ? out : null;
+}
 const KEY = 'validador-lead-params-v1';
 let PARAMS = JSON.parse(JSON.stringify(DEFAULTS));
-try{ const sv = localStorage.getItem(KEY); if(sv) PARAMS = JSON.parse(sv); }catch(e){}
+try{ const sv = localStorage.getItem(KEY); const p = sv ? sanear(JSON.parse(sv)) : null; if(p) PARAMS = p; }catch(e){}
 function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify(PARAMS)); }catch(e){} }
 const esc = t => String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
@@ -70,7 +81,7 @@ function calc(){
   const media = qtd ? vals.reduce((a,b)=>a+b,0)/qtd : null;
   const social = $('social').checked;
   const dist = $('dist').value, tipo = $('tipo').value;
-  const minimo = (dist && tipo) ? PARAMS[dist][tipo] : null;
+  const minimo = (dist && tipo && PARAMS[dist] && Number.isFinite(PARAMS[dist][tipo])) ? PARAMS[dist][tipo] : null;
 
   $('qtd').textContent = qtd + (EXCL.size ? ` (${EXCL.size} desconsiderado${EXCL.size>1?'s':''})` : '');
   checarVariacao();
@@ -123,7 +134,8 @@ function calc(){
 const AC_DEFAULT = [{btu:9000,kwh:100},{btu:12000,kwh:150},{btu:18000,kwh:250},{btu:20000,kwh:300},{btu:24000,kwh:400}];
 const ACKEY = 'validador-lead-ac-v1';
 let AC = JSON.parse(JSON.stringify(AC_DEFAULT));
-try{ const sa = localStorage.getItem(ACKEY); if(sa) AC = JSON.parse(sa); }catch(e){}
+try{ const sa = localStorage.getItem(ACKEY); const a = sa ? JSON.parse(sa) : null;
+  if(Array.isArray(a) && a.length && a.every(x=>x && Number.isFinite(x.btu) && Number.isFinite(x.kwh) && x.kwh >= 0)) AC = a; }catch(e){}
 function renderAC(){
   $('acs').innerHTML = AC.map((a,i)=>
     `<div class="acrow"><span>${a.btu.toLocaleString('pt-BR')} BTUs</span>` +
@@ -247,7 +259,9 @@ function analisarFatura(txt){
   // distribuidora: a que aparece primeiro no texto
   let best = null;
   Object.keys(PARAMS).forEach(d=>{
-    const i = T.indexOf(semAcento(d.split(' - ')[0]).toUpperCase());
+    const nome = semAcento(d.split(' - ')[0]).toUpperCase();
+    let i = T.indexOf(nome);
+    if(i<0) i = T.indexOf(nome.split(' ')[0]);   // ex.: "CPFL" quando a fatura não traz "CPFL PAULISTA"
     if(i>=0 && (!best || i<best.i)) best = {d,i};
   });
   r.dist = best ? best.d : null;
@@ -297,7 +311,7 @@ function aplicarFatura(txt){
   const r = analisarFatura(txt), msg = [];
   if(r.dist){ $('dist').value = r.dist; msg.push('Distribuidora: <b>'+esc(r.dist)+'</b>'); } else msg.push('Distribuidora: não identificada');
   if(r.tipo){ $('tipo').value = r.tipo; msg.push('Tipo de atendimento: <b>'+r.tipo+'</b>'); } else msg.push('Tipo de atendimento: não identificado');
-  for(let i=1;i<=12;i++){
+  if(r.meses.length) for(let i=1;i<=12;i++){   // sem histórico na fatura, não apaga os meses já digitados
     const h = r.meses[i-1];
     $('m'+i).value = h ? h.v : '';
     document.querySelector('label[for=m'+i+']').textContent = 'Mês '+String(i).padStart(2,'0') + (h ? ' ('+h.rot+')' : '');
@@ -374,6 +388,9 @@ $('fatura').addEventListener('change', async e=>{
   }catch(err){ st.className='note err'; st.textContent='Não consegui ler a fatura: ' + err.message; }
 });
 $('reanalisar').addEventListener('click',()=>{ if($('impTexto').value.trim()) aplicarFatura($('impTexto').value); });
+/* os dois campos de limite (resultado e configuração) andam juntos */
+$('lim').addEventListener('input',()=>{ $('limiar').value = $('lim').value; });
+$('limiar').addEventListener('input',()=>{ $('lim').value = $('limiar').value; });
 document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',calc));
 $('limpar').addEventListener('click',()=>{document.querySelectorAll('.mes,.acq').forEach(i=>i.value='');OUTROS=[];renderOutros();$('gPossui').checked=false;$('gCarteira').checked=false;$('gKwh').value='';$('gSaldo').value='';toggleGeracao();});
 calc();
