@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Simulador de desconto por indicação</title>
-<link rel="stylesheet" href="css/tema.css">
-<link rel="stylesheet" href="css/indicacao.css">
-<script src="js/tema.js"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.2.0">
+<link rel="stylesheet" href="css/indicacao.css?v=1.2.0">
+<script src="js/tema.js?v=1.2.0"></script>
 </head>
 <body>
 <header><h1>Simulador de desconto por indicação</h1></header>
@@ -33,14 +33,14 @@
         <small>% do desconto concedido ao indicado. 100% = mesmo valor.</small>
       </div>
     </div>
-      <button type="button" class="btn-limpar" id="limpar">Limpar campos</button>
-    </section>
+    <div class="acoes"><button type="button" class="btn-limpar" id="limpar">Limpar campos</button></div>
+  </section>
 
-  <div id="out"><p class="empty">Preencha as duas faturas para simular.</p></div>
+  <div id="out" aria-live="polite"><p class="empty">Preencha as duas faturas para simular.</p></div>
   <footer class="credit">Documento criado por Gustavo Maia</footer>
 </main>
 
-<script src="js/indicacao.js"></script>
-<script src="js/rastreio.js" data-ferramenta="indicacao" data-alvo="#out" data-valido="#out .hl"></script>
+<script src="js/indicacao.js?v=1.2.0"></script>
+<script src="js/rastreio.js?v=1.2.0" data-ferramenta="indicacao" data-alvo="#out" data-valido="#out .hl"></script>
 </body>
 </html>

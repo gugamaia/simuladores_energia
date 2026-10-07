@@ -10,6 +10,18 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.2.0] - 2026-10-07
+Validada por 564 testes automatizados e 20 testes em Chromium real.
+
+### Adicionado
+- **Botão "Limpar campos" na simulação de indicação:** zera a fatura de quem indica e a do indicado, volta o resultado para a mensagem inicial e leva o cursor ao primeiro campo. Os percentuais da campanha (50% e 100%) são mantidos.
+- **Atualização forçada dos arquivos:** os `css` e `js` agora são chamados com `?v=<versão>`, para o navegador não usar uma cópia antiga em cache depois de uma atualização do site.
+- **`tests/versionar.js`:** troca a versão em todo o site de uma vez (`versao.js` e os `?v=` dos HTML).
+
+### Alterado
+- O resultado da indicação é anunciado por leitores de tela (`aria-live`).
+- Os testes passam a conferir que todos os `css`/`js` usam a versão atual em `?v=`.
+
 ## [1.1.2] - 2026-10-06
 ### Corrigido
 - **Proposta:** o espaço entre "Atenciosamente," e o cargo do consultor ficava pequeno quando o nome estava em branco. Agora há um **espaço reservado de 64 px** para o consultor colocar o nome (digitado no campo "Consultor(a)" ou escrito à mão depois de imprimir), na prévia, no PDF e no JPG.

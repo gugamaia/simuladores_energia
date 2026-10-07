@@ -45,6 +45,7 @@ const rows = (el) => [...el.querySelectorAll('.row')].map(r => [r.children[0].te
 /* ======================= A) ESTÁTICO ======================= */
 async function estatico() {
   section('A) Estrutura, arquivos e boas práticas');
+  const VERNUM = (() => { const o = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(o); return o.VERSAO.numero; })();
   const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js', 'parametros.js', '.github/workflows/testes.yml', 'js/vendor/pdf.min.js', 'js/vendor/pdf.worker.min.js', 'js/vendor/LICENSE-pdfjs.txt', 'tests/package-lock.json', 'tests/extrair-fixture.js', 'versao.js', 'CHANGELOG.md', 'proposta.html', 'css/proposta.css', 'css/tema.css', 'js/proposta.js', 'js/tema.js', 'js/proposta-imagens.js', 'js/vendor/html2canvas.min.js', 'js/vendor/jspdf.umd.min.js', 'fonts/montserrat-latin-wght-normal.woff2'];
   files.forEach(f => ok(fs.existsSync(path.join(ROOT, f)), 'arquivo existe: ' + f));
   for (const f of ['config.js', 'versao.js', 'parametros.js', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'js/tema.js', 'js/proposta.js']) {
@@ -63,8 +64,9 @@ async function estatico() {
     const ids = [...d.querySelectorAll('[id]')].map(e => e.id); const dup = ids.filter((x, i) => ids.indexOf(x) !== i);
     ok(!dup.length, f + ': ids únicos', dup.join(','));
     [...d.querySelectorAll('link[href],script[src]')].forEach(e => {
-      const u = e.getAttribute('href') || e.getAttribute('src');
+      const bruto = e.getAttribute('href') || e.getAttribute('src'), u = bruto.split('?')[0];
       if (/^(https?:)?\/\//.test(u)) return;
+      if (!/^js\/vendor\/|^fonts\//.test(u)) ok(bruto === u + '?v=' + VERNUM, f + ': ' + u + ' com ?v=' + VERNUM + ' (força o navegador a pegar a versão nova)', bruto);
       ok(!u.startsWith('/'), f + ': caminho relativo (GitHub Pages) ' + u);
       ok(fs.existsSync(path.join(ROOT, u)), f + ': recurso existe ' + u);
     });
@@ -134,6 +136,16 @@ async function indicacao() {
     if (!(Math.abs(paga - esperaPaga) < 0.011 && mesesTxt === meses)) { erros++; if (!amostra) amostra = `fInd=${fInd} fInv=${fInv} ${pInv}%/${pInd}% esperado ${meses}m paga ${esperaPaga} obtido ${mesesTxt}m paga ${paga}`; }
   }
   ok(erros === 0, 'propriedade (400 casos aleatórios): meses de isenção e valor do mês de retorno', erros + ' divergências. ' + amostra);
+  // botão Limpar campos
+  const lb = $(w, 'limpar'); ok(!!lb && lb.type === 'button' && /Limpar campos/.test(lb.textContent) && !lb.closest('.grid'), 'botão "Limpar campos" existe (type=button, fora da grade de campos)');
+  run(150, 400, 60, 80); ok(/isenta|Crédito/.test(txt(w, 'out')), 'antes de limpar há resultado'); lb.click();
+  ok($(w, 'fInd').value === '' && $(w, 'fInv').value === '', 'limpar zera a fatura de quem indica e a do indicado');
+  ok(/Preencha as duas faturas/.test(txt(w, 'out')), 'limpar volta o resultado para a mensagem inicial');
+  ok($(w, 'pInv').value === '60' && $(w, 'pInd').value === '80', 'limpar mantém os percentuais da campanha');
+  ok(w.document.activeElement === $(w, 'fInd'), 'limpar leva o cursor ao primeiro campo');
+  lb.click(); lb.click(); ok(/Preencha as duas faturas/.test(txt(w, 'out')) && !w.__errors.length, 'limpar com campos já vazios não quebra', w.__errors.join('|'));
+  r = run(100, 300, 50, 100); ok(txt(w, 'out').includes('isenta por 1 mês') && num(r[2]['Volta a pagar no mês 2']) === 50, 'depois de limpar, um novo cálculo funciona normalmente');
+  setv(w, 'fInd', 100); setv(w, 'fInv', 300); lb.click(); setv(w, 'fInd', 200); ok(/Preencha/.test(txt(w, 'out')), 'depois de limpar, preencher só uma fatura continua pedindo a outra');
   w.close();
 }
 

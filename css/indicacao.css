@@ -30,5 +30,8 @@ th{color:var(--mute);font-weight:600}
 td.r,th.r{text-align:right}
 .scroll{overflow-x:auto}
 .credit{margin-top:24px;text-align:center;color:var(--mute);font-size:.85rem}
-.btn-limpar{margin-top:14px;padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;font:inherit;cursor:pointer}
+
+/* botão Limpar campos */
+.acoes{margin-top:14px}
+.btn-limpar{padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;font:inherit;cursor:pointer}
 .btn-limpar:hover,.btn-limpar:focus-visible{border-color:var(--acc);outline:2px solid var(--acc)}

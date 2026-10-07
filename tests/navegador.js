@@ -38,6 +38,16 @@ const servidor = http.createServer((req, res) => {
   ok(yb < yc && yc < ya, 'celular: ordem dados do lead, resultado, demais cartões', [yb, yc, ya].map(Math.round).join('/'));
   const largura = await p.evaluate(() => document.documentElement.scrollWidth); ok(largura <= 392, 'celular: sem rolagem horizontal', String(largura));
   await p.context().close();
+  // 3b) indicação: botão Limpar campos
+  p = await novaPagina(1600, 900); await p.goto(base + 'index.html#indicacao'); await p.waitForTimeout(1200); f = p.frameLocator('#frame');
+  await f.locator('#fInd').fill('100'); await f.locator('#fInv').fill('300'); await p.waitForTimeout(300);
+  ok(await f.locator('#out .hl').count() === 1, 'indicação: resultado aparece ao preencher');
+  const bt = await caixa(f.locator('#limpar')), gr = await caixa(f.locator('.grid')); ok(!!bt && bt.y >= gr.y + gr.height, 'indicação: botão Limpar abaixo dos campos', JSON.stringify([bt && Math.round(bt.y), gr && Math.round(gr.y + gr.height)]));
+  await f.locator('#limpar').click(); await p.waitForTimeout(200);
+  ok(await f.locator('#fInd').inputValue() === '' && await f.locator('#fInv').inputValue() === '' && /Preencha/.test(await f.locator('#out').textContent()), 'indicação: Limpar zera as faturas e o resultado');
+  ok(await f.locator('#fInd').evaluate(e => e === document.activeElement), 'indicação: foco volta ao primeiro campo');
+  await p.click('.chave'); await p.waitForTimeout(300); ok((await caixa(f.locator('#limpar'))).width > 80, 'indicação: botão visível também no tema claro');
+  await p.context().close();
   // 4) proposta: PDF e JPG reais
   p = await novaPagina(1600, 1043); await p.goto(base + 'index.html#proposta'); await p.waitForTimeout(1500); f = p.frameLocator('#frame');
   await f.locator('#pConsultor').fill('Maria Souza'); await f.locator('#pCliente').fill('João da Silva Ltda'); await f.locator('#pConsumo').fill('450'); await f.locator('#pMensalidade').fill('389.9'); await f.locator('#pEconomia').fill('1250');
