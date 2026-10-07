@@ -4,14 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Validador de lead - consumo médio x faixa de atendimento</title>
+<link rel="stylesheet" href="css/tema.css">
 <link rel="stylesheet" href="css/consumo.css">
+<script src="js/tema.js"></script>
 </head>
 <body>
 <header><h1>Validador de lead – consumo médio x faixa de atendimento</h1></header>
 <main>
   <p class="hint">Preencha os meses de consumo do lead (até 12), selecione a distribuidora e o tipo de atendimento. A média considera apenas os meses informados.</p>
   <div class="layout">
-    <section>
+    <section class="col-a">
     <div class="card">
       <details open>
         <summary>Importar fatura da distribuidora</summary>
@@ -26,21 +28,7 @@
       </details>
     </div>
     <div class="card">
-      <h2>Dados do lead</h2>
-      <label for="dist">Distribuidora</label>
-      <select id="dist"></select>
-      <label for="tipo">Tipo de atendimento</label>
-      <select id="tipo">
-        <option value="">Selecione...</option>
-        <option>Monofásico</option><option>Bifásico</option><option>Trifásico</option>
-      </select>
-      <label class="chk"><input type="checkbox" id="social"><span>Cliente com benefício do governo (tarifa social)<small>Desconta 200 kWh da média antes de comparar com o mínimo.</small></span></label>
-      <h2 class="mt-18">Consumo dos últimos meses (kWh)</h2>
-      <div class="months" id="months"></div>
-      <button class="btn" id="limpar" type="button">Limpar consumos, produtos e geração</button>
-    </div>
-    <div class="card">
-      <details open>
+      <details>
         <summary>Ar-condicionado a instalar<span id="acBadge" class="badge"></span></summary>
         <p class="legend">Informe a quantidade de cada modelo (pode somar vários aparelhos). O consumo extra por aparelho é editável.</p>
         <div class="acrow achead"><span>Modelo</span><span>Extra (kWh/mês)</span><span>Qtd</span></div>
@@ -48,7 +36,7 @@
       </details>
     </div>
     <div class="card">
-      <details open>
+      <details>
         <summary>Outros produtos<span id="oBadge" class="badge"></span></summary>
         <p class="legend">Adicione outros equipamentos que entram na média mensal (consumo em kWh por mês de cada unidade).</p>
         <div id="outros"></div>
@@ -79,8 +67,23 @@
       </details>
     </div>
     </section>
-
-    <section>
+    <section class="col-b">
+    <div class="card">
+      <h2>Dados do lead</h2>
+      <label for="dist">Distribuidora</label>
+      <select id="dist"></select>
+      <label for="tipo">Tipo de atendimento</label>
+      <select id="tipo">
+        <option value="">Selecione...</option>
+        <option>Monofásico</option><option>Bifásico</option><option>Trifásico</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="social"><span>Cliente com benefício do governo (tarifa social)<small>Desconta 200 kWh da média antes de comparar com o mínimo.</small></span></label>
+      <h2 class="mt-18">Consumo dos últimos meses (kWh)</h2>
+      <div class="months" id="months"></div>
+      <button class="btn" id="limpar" type="button">Limpar consumos, produtos e geração</button>
+    </div>
+    </section>
+    <section class="col-c">
       <div class="card">
         <h2>Resultado</h2>
         <div class="row"><span>Meses informados</span><b id="qtd">0</b></div>
@@ -106,7 +109,7 @@
         <p class="legend">Verde: média dentro da faixa · Vermelho: média fora da faixa · Laranja: falta configurar/selecionar.</p>
       </div>
       <div class="card">
-        <details open>
+        <details>
           <summary>Parâmetros de atendimento (editáveis)</summary>
           <p class="legend">Os valores vêm do arquivo <code>parametros.js</code> do repositório. Ajustes feitos aqui ficam só neste navegador até serem exportados e publicados.</p>
           <p class="legend" id="paramInfo"></p>

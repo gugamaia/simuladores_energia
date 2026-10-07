@@ -1,0 +1,54 @@
+/* Teste em navegador real (opcional): layout, tema e geração de PDF/JPG da proposta.
+   Requer um Chromium: instale com `npx playwright-core install chromium` ou aponte CHROME_PATH para o executável.
+   Uso: cd tests && npm run test:navegador */
+const http = require('http'), fs = require('fs'), path = require('path');
+const { chromium } = require('playwright-core');
+const ROOT = path.resolve(__dirname, '..'), TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json' };
+let pass = 0, fail = 0; const falhas = [];
+const ok = (c, nome, det) => { if (c) pass++; else { fail++; falhas.push(nome + (det !== undefined ? ' -> ' + det : '')); } };
+const servidor = http.createServer((req, res) => {
+  const f = path.join(ROOT, decodeURIComponent(req.url.split('?')[0].split('#')[0]).replace(/^\/$/, '/index.html'));
+  if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
+  res.writeHead(200, { 'Content-Type': TIPOS[path.extname(f)] || 'application/octet-stream' }); res.end(fs.readFileSync(f));
+});
+(async () => {
+  await new Promise(r => servidor.listen(0, r)); const base = 'http://localhost:' + servidor.address().port + '/';
+  const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox'] });
+  const erros = [];
+  const novaPagina = async (w, h, esquema) => { const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: esquema || 'dark', acceptDownloads: true }); const p = await ctx.newPage(); p.on('pageerror', e => erros.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/404/.test(m.text())) erros.push(m.text()); }); return p; };
+  const caixa = async (loc) => loc.boundingBox();
+
+  // 1) layout em 3 colunas (1600 px) e barra centralizada
+  let p = await novaPagina(1600, 1043); await p.goto(base + 'index.html#consumo'); await p.waitForTimeout(1200);
+  let f = p.frameLocator('#frame'); const A = await caixa(f.locator('.col-a')), B = await caixa(f.locator('.col-b')), C = await caixa(f.locator('.col-c'));
+  ok(A.x < B.x - 300 && B.x < C.x - 300, 'consumo: três colunas lado a lado', [A.x, B.x, C.x].map(Math.round).join('/'));
+  ok(A.width <= 372 && B.width <= 372 && C.width <= 372, 'consumo: colunas de até 370 px', [A.width, B.width, C.width].map(Math.round).join('/'));
+  const nav = await caixa(p.locator('.nav-links')); ok(Math.abs(nav.x + nav.width / 2 - 800) < 25, 'barra: links centralizados', String(Math.round(nav.x + nav.width / 2)));
+  const ver = await caixa(p.locator('#versaoNav')); ok(ver.x > 1450, 'barra: versão à direita', String(Math.round(ver.x)));
+  // 2) tema
+  const fundo = async () => f.locator('body').evaluate(e => getComputedStyle(e).backgroundColor);
+  const escuro = await fundo(); await p.click('#tema'); await p.waitForTimeout(400); const claro = await fundo();
+  ok(escuro === 'rgb(15, 22, 28)' && claro === 'rgb(243, 245, 247)', 'tema: escuro e claro aplicados dentro do simulador', escuro + ' / ' + claro);
+  ok(await p.locator('html').getAttribute('data-tema') === 'claro', 'tema: menu em modo claro');
+  await p.context().close();
+  // 3) celular: uma coluna, dados do lead primeiro
+  p = await novaPagina(390, 800); await p.goto(base + 'consumo.html'); await p.waitForTimeout(600);
+  const yb = (await caixa(p.locator('.col-b'))).y, ya = (await caixa(p.locator('.col-a'))).y, yc = (await caixa(p.locator('.col-c'))).y;
+  ok(yb < yc && yc < ya, 'celular: ordem dados do lead, resultado, demais cartões', [yb, yc, ya].map(Math.round).join('/'));
+  const largura = await p.evaluate(() => document.documentElement.scrollWidth); ok(largura <= 392, 'celular: sem rolagem horizontal', String(largura));
+  await p.context().close();
+  // 4) proposta: PDF e JPG reais
+  p = await novaPagina(1600, 1043); await p.goto(base + 'index.html#proposta'); await p.waitForTimeout(1500); f = p.frameLocator('#frame');
+  await f.locator('#pConsultor').fill('Maria Souza'); await f.locator('#pCliente').fill('João da Silva Ltda'); await f.locator('#pConsumo').fill('450'); await f.locator('#pMensalidade').fill('389.9'); await f.locator('#pEconomia').fill('1250');
+  const [d1] = await Promise.all([p.waitForEvent('download'), f.locator('#pdf').click()]); const pdf = '/tmp/_proposta.pdf'; await d1.saveAs(pdf);
+  ok(d1.suggestedFilename() === 'proposta_axs_joao-da-silva-ltda.pdf', 'proposta: nome do PDF', d1.suggestedFilename());
+  ok(fs.readFileSync(pdf).slice(0, 4).toString() === '%PDF' && fs.statSync(pdf).size < 4e6, 'proposta: PDF válido e leve (< 4 MB)', String(fs.statSync(pdf).size));
+  await p.waitForTimeout(500); const [d2] = await Promise.all([p.waitForEvent('download'), f.locator('#jpg').click()]); const jpg = '/tmp/_proposta.jpg'; await d2.saveAs(jpg);
+  const buf = fs.readFileSync(jpg); ok(buf[0] === 0xff && buf[1] === 0xd8 && d2.suggestedFilename().endsWith('.jpg'), 'proposta: JPG válido');
+  let i = 2, w = 0, h = 0; while (i < buf.length) { if (buf[i] !== 0xff) break; const m = buf[i + 1], len = buf.readUInt16BE(i + 2); if (m >= 0xc0 && m <= 0xc3) { h = buf.readUInt16BE(i + 5); w = buf.readUInt16BE(i + 7); break; } i += 2 + len; }
+  ok(w === 2000 && h > 3000, 'proposta: JPG com 2000 px de largura (folha de 1000 px, escala 2)', w + 'x' + h);
+  await p.context().close();
+  ok(!erros.length, 'nenhum erro de script no navegador', erros.join(' | '));
+  await b.close(); servidor.close();
+  console.log(`Aprovados: ${pass}   Reprovados: ${fail}`); falhas.forEach(x => console.log(' x ' + x)); process.exit(fail ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });

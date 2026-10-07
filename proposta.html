@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposta de oferta - AXS Energia</title>
+<link rel="stylesheet" href="css/tema.css">
+<link rel="stylesheet" href="css/proposta.css">
+<script src="js/tema.js"></script>
+</head>
+<body>
+<header><h1>Proposta de oferta &ndash; AXS Energia</h1></header>
+<main>
+  <p class="hint">Preencha os campos; a pr&eacute;via da proposta &eacute; atualizada na hora. Depois, baixe em PDF ou JPG.</p>
+  <div class="layout">
+    <section class="col-form">
+      <div class="card">
+        <details open>
+          <summary>Dados da proposta</summary>
+          <label for="pConsultor">Consultor(a)</label>
+          <input type="text" id="pConsultor" placeholder="Nome do consultor(a)">
+          <label for="pCliente">Cliente</label>
+          <input type="text" id="pCliente" placeholder="Nome do cliente">
+          <div class="duas">
+            <div><label for="pData">Data da proposta</label><input type="date" id="pData"></div>
+            <div><label for="pValidade">Validade da proposta</label><input type="text" id="pValidade" placeholder="dd/mm/aaaa"></div>
+          </div>
+          <label for="pValidadeRapida">Validade r&aacute;pida (a partir da data da proposta)</label>
+          <select id="pValidadeRapida">
+            <option value="">Escolher...</option>
+            <option value="7">7 dias</option>
+            <option value="15">15 dias</option>
+            <option value="30">30 dias</option>
+          </select>
+          <label for="pUC">UC (Unidade Consumidora)</label>
+          <input type="text" id="pUC" placeholder="N&uacute;mero da UC">
+        </details>
+      </div>
+      <div class="card">
+        <details open>
+          <summary>Valores da economia</summary>
+          <label for="pConsumo">Consumo m&eacute;dio previsto (kWh/m&ecirc;s)</label>
+          <input type="number" id="pConsumo" min="0" step="1" inputmode="decimal" placeholder="0">
+          <label for="pMensalidade">Mensalidade AXS (R$)</label>
+          <input type="number" id="pMensalidade" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+          <label for="pEconomia">Economia anual estimada (R$)</label>
+          <input type="number" id="pEconomia" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+        </details>
+      </div>
+      <div class="card">
+        <details>
+          <summary>Textos e benef&iacute;cios</summary>
+          <label for="pObs">Observa&ccedil;&atilde;o</label>
+          <textarea id="pObs" rows="7"></textarea>
+          <label for="pCargo">Cargo na assinatura</label>
+          <input type="text" id="pCargo">
+          <label for="pB1">Benef&iacute;cio 1</label><input type="text" id="pB1">
+          <label for="pB2">Benef&iacute;cio 2</label><input type="text" id="pB2">
+          <label for="pB3">Benef&iacute;cio 3</label><input type="text" id="pB3">
+          <p class="legend">Deixe um benef&iacute;cio em branco para ocult&aacute;-lo.</p>
+        </details>
+      </div>
+      <div class="card acoes">
+        <button class="btn btn-pdf" id="pdf" type="button">Baixar PDF</button>
+        <button class="btn btn-jpg" id="jpg" type="button">Baixar JPG</button>
+        <button class="btn btn-limpar" id="limpar" type="button">Limpar campos</button>
+        <p class="legend" id="msg" role="status"></p>
+      </div>
+    </section>
+
+    <section class="col-prev">
+      <div class="card">
+        <h2>Pr&eacute;via da proposta</h2>
+        <div class="prev-wrap" id="prevWrap">
+          <div id="capture" class="px">
+            <section class="px-proposal">
+              <div class="px-header">
+                <div class="px-logo"><img id="imgLogo" alt="AXS Energia"></div>
+                <div class="px-header-fields">
+                  <div class="px-field"><div class="px-label">Consultor(a)</div><div class="px-value" id="vConsultor"></div></div>
+                  <div class="px-field"><div class="px-label">Cliente</div><div class="px-value" id="vCliente"></div></div>
+                </div>
+              </div>
+              <div class="px-meta">
+                <div class="px-field"><div class="px-label">Data da Proposta</div><div class="px-value" id="vData"></div></div>
+                <div class="px-field"><div class="px-label">Validade da Proposta</div><div class="px-value" id="vValidade"></div></div>
+                <div class="px-field"><div class="px-label">UC (Unidade Consumidora)</div><div class="px-value" id="vUC"></div></div>
+              </div>
+              <h2 class="px-title">Detalhamento da economia</h2>
+              <div class="px-cards">
+                <div class="px-card"><div class="px-icon">&#9889;</div><div class="px-card-title">Consumo m&eacute;dio previsto</div><div class="px-card-value" id="vConsumo"></div></div>
+                <div class="px-card"><div class="px-icon">&#128176;</div><div class="px-card-title">Mensalidade AXS</div><div class="px-card-value" id="vMensalidade"></div></div>
+                <div class="px-card"><div class="px-icon">&#128200;</div><div class="px-card-title">Economia anual estimada</div><div class="px-card-value" id="vEconomia"></div></div>
+              </div>
+              <div class="px-obs"><strong>Observa&ccedil;&atilde;o:</strong><br><br><span id="vObs"></span></div>
+              <div class="px-signature">Atenciosamente,<br><span class="px-signature-name" id="vAssinatura"></span><br><span id="vCargo"></span></div>
+              <div class="px-benefits" id="vBeneficios">
+                <div class="px-benefit" id="vB1"></div><div class="px-benefit" id="vB2"></div><div class="px-benefit" id="vB3"></div>
+              </div>
+            </section>
+            <section class="px-banner"><img id="imgBanner" alt="Banner AXS Energia"></section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="js/vendor/html2canvas.min.js"></script>
+<script src="js/vendor/jspdf.umd.min.js"></script>
+<script src="js/proposta-imagens.js"></script>
+<script src="js/proposta.js"></script>
+</body>
+</html>

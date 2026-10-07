@@ -2,9 +2,22 @@ const CFG = window.CONFIG || {};
 const GC = String(CFG.goatcounter||'').trim();
 const TOOLS = {
   indicacao:{titulo:'Desconto por indica\u00e7\u00e3o', src:'indicacao.html'},
-  consumo:{titulo:'M\u00e9dia e necessidade de consumo', src:'consumo.html'}
+  consumo:{titulo:'M\u00e9dia e necessidade de consumo', src:'consumo.html'},
+  proposta:{titulo:'Proposta de oferta', src:'proposta.html'}
 };
 const $ = id => document.getElementById(id);
+
+/* ---- Tema claro/escuro (js/tema.js) ---- */
+function enviarTema(){ const f = $('frame').contentWindow; if(f) f.postMessage({tipo:'tema', tema:Tema.atual()}, '*'); }
+function pintarTema(){
+  const escuro = Tema.atual() === 'escuro', b = $('tema');
+  b.innerHTML = escuro ? '&#9728;' : '&#127769;';
+  b.title = escuro ? 'Mudar para o tema claro' : 'Mudar para o tema escuro';
+  b.setAttribute('aria-pressed', escuro ? 'true' : 'false');
+}
+$('tema').addEventListener('click', ()=>{ Tema.alternar(); pintarTema(); enviarTema(); });
+$('frame').addEventListener('load', enviarTema);
+pintarTema();
 
 /* ---- Versão publicada (versao.js) ---- */
 const VER = window.VERSAO || {numero:'?', data:''};
@@ -36,6 +49,8 @@ window.addEventListener('message', e=>{
   if(e.source !== $('frame').contentWindow) return;
   const d = e.data || {};
   if(d.tipo==='simulacao' && TOOLS[d.ferramenta]) contar('simulacao-'+d.ferramenta, 'Simula\u00e7\u00e3o - '+TOOLS[d.ferramenta].titulo);
+  if(d.tipo==='proposta') contar('proposta-gerada', 'Proposta gerada');
+  if(d.tipo==='tema-pedir') enviarTema();
 });
 
 /* ---- Painel de uso ---- */
@@ -48,7 +63,8 @@ async function painel(){
   if(NAO_CONTAR) document.querySelector('#stats .priv').textContent += ' Suas visitas não estão sendo contadas neste navegador.';
   const base = 'https://'+GC+'.goatcounter.com/counter/';
   const get = p => jget(base+encodeURIComponent(p)+'.json').then(j=>num(j.count)).catch(()=>null);
-  const [ac, si, sc] = await Promise.all([get(location.pathname||'/'), get('/simulacao-indicacao'), get('/simulacao-consumo')]);
+  const [ac, si, sc, pr] = await Promise.all([get(location.pathname||'/'), get('/simulacao-indicacao'), get('/simulacao-consumo'), get('/proposta-gerada')]);
+  $('kProps').textContent = pr===null ? '-' : fmt(pr);
   $('kAcessos').textContent = ac===null ? '-' : fmt(ac);
   if(si===null && sc===null){ $('kSims').textContent = '-'; }
   else { $('kSims').textContent = fmt((si||0)+(sc||0)); $('kSimsDet').textContent = 'Indica\u00e7\u00e3o: '+fmt(si||0)+' \u00b7 Consumo: '+fmt(sc||0); }

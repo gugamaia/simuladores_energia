@@ -4,15 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Simuladores</title>
+<link rel="stylesheet" href="css/tema.css">
 <link rel="stylesheet" href="css/index.css">
+<script src="js/tema.js"></script>
 </head>
 <body>
-<header>
+<header id="topo">
   <nav id="nav" aria-label="Navega&ccedil;&atilde;o principal">
-    <a href="#inicio" data-k="inicio">P&aacute;gina principal</a>
-    <a href="#indicacao" data-k="indicacao">Simula&ccedil;&atilde;o de indica&ccedil;&atilde;o</a>
-    <a href="#consumo" data-k="consumo">Simula&ccedil;&atilde;o de consumo de energia</a>
-    <span class="versao" id="versaoNav"></span>
+    <span class="nav-esq" aria-hidden="true"></span>
+    <div class="nav-links">
+      <a href="#inicio" data-k="inicio">P&aacute;gina principal</a>
+      <a href="#indicacao" data-k="indicacao">Simula&ccedil;&atilde;o de indica&ccedil;&atilde;o</a>
+      <a href="#consumo" data-k="consumo">Simula&ccedil;&atilde;o de consumo de energia</a>
+      <a href="#proposta" data-k="proposta">Proposta de oferta</a>
+    </div>
+    <div class="nav-dir">
+      <button id="tema" class="tema" type="button" aria-label="Alternar tema claro/escuro"></button>
+      <span class="versao" id="versaoNav"></span>
+    </div>
   </nav>
 </header>
 <div id="menu">
@@ -27,12 +36,17 @@
       <div class="ico">&#9889;</div><h2>M&eacute;dia e necessidade de consumo</h2>
       <p>Calcule a m&eacute;dia dos &uacute;ltimos meses, some AC, outros produtos e gera&ccedil;&atilde;o, e confira se o cliente atinge o m&iacute;nimo da faixa de atendimento.</p>
     </button>
+    <button class="opt" data-k="proposta" type="button">
+      <div class="ico">&#128196;</div><h2>Proposta de oferta</h2>
+      <p>Preencha os valores da economia e baixe a proposta da AXS Energia em PDF ou JPG.</p>
+    </button>
   </div>
   <section id="stats" hidden>
     <h3>Uso da ferramenta</h3>
     <div class="kpis">
       <div class="kpi"><b id="kAcessos">-</b><span>Acessos</span></div>
       <div class="kpi"><b id="kSims">-</b><span>Simula&ccedil;&otilde;es realizadas</span><span id="kSimsDet"></span></div>
+      <div class="kpi"><b id="kProps">-</b><span>Propostas geradas</span></div>
     </div>
     <h3 class="mt-18">Top 5 localidades</h3>
     <ul id="top5"><li class="mute">Carregando...</li></ul>

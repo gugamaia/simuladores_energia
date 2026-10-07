@@ -45,12 +45,12 @@ const rows = (el) => [...el.querySelectorAll('.row')].map(r => [r.children[0].te
 /* ======================= A) ESTÁTICO ======================= */
 async function estatico() {
   section('A) Estrutura, arquivos e boas práticas');
-  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js', 'parametros.js', '.github/workflows/testes.yml', 'js/vendor/pdf.min.js', 'js/vendor/pdf.worker.min.js', 'js/vendor/LICENSE-pdfjs.txt', 'tests/package-lock.json', 'tests/extrair-fixture.js', 'versao.js', 'CHANGELOG.md'];
+  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js', 'parametros.js', '.github/workflows/testes.yml', 'js/vendor/pdf.min.js', 'js/vendor/pdf.worker.min.js', 'js/vendor/LICENSE-pdfjs.txt', 'tests/package-lock.json', 'tests/extrair-fixture.js', 'versao.js', 'CHANGELOG.md', 'proposta.html', 'css/proposta.css', 'css/tema.css', 'js/proposta.js', 'js/tema.js', 'js/proposta-imagens.js', 'js/vendor/html2canvas.min.js', 'js/vendor/jspdf.umd.min.js', 'fonts/montserrat-latin-wght-normal.woff2'];
   files.forEach(f => ok(fs.existsSync(path.join(ROOT, f)), 'arquivo existe: ' + f));
-  for (const f of ['config.js', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js']) {
+  for (const f of ['config.js', 'versao.js', 'parametros.js', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'js/tema.js', 'js/proposta.js']) {
     try { new Function(fs.readFileSync(path.join(ROOT, f), 'utf8')); ok(true, ''); } catch (e) { ok(false, 'sintaxe JS ' + f, e.message); }
   }
-  for (const f of ['index.html', 'indicacao.html', 'consumo.html']) {
+  for (const f of ['index.html', 'indicacao.html', 'consumo.html', 'proposta.html']) {
     const html = fs.readFileSync(path.join(ROOT, f), 'utf8');
     const d = new JSDOM(html).window.document;
     ok(d.documentElement.lang === 'pt-BR', f + ': lang="pt-BR"');
@@ -81,6 +81,7 @@ async function estatico() {
   ok(!gi.split('\n').includes('config.js') && !gi.split('\n').includes('css/') && !gi.split('\n').includes('js/'), '.gitignore não exclui arquivos do site');
   ok(fs.statSync(path.join(ROOT, 'js/vendor/pdf.min.js')).size > 100000 && fs.statSync(path.join(ROOT, 'js/vendor/pdf.worker.min.js')).size > 500000, 'pdf.js local tem tamanho esperado');
   ok(!/cdnjs\.cloudflare/.test(fs.readFileSync(path.join(ROOT, 'consumo.html'), 'utf8') + fs.readFileSync(path.join(ROOT, 'js/consumo.js'), 'utf8')), 'leitor de PDF não depende de CDN');
+  ok(!/cdnjs|googleapis|gstatic|unpkg|jsdelivr/.test(['proposta.html', 'css/proposta.css', 'js/proposta.js'].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('')), 'proposta não depende de CDN nem de fontes externas');
   ok(/runs-on|npm ci/.test(fs.readFileSync(path.join(ROOT, '.github/workflows/testes.yml'), 'utf8')), 'workflow de testes presente');
   ok(typeof PARAM.versao === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(PARAM.atualizadoEm) && PARAM.descontoSocial === 200 && PARAM.acs.length === 5, 'parametros.js: versão, data, desconto social e 5 modelos de AC');
   ok(JSON.stringify(Object.keys(PARAM.distribuidoras)) === JSON.stringify(Object.keys(TAB)) && Object.entries(PARAM.distribuidoras).every(([d, t]) => TIPOS.every((k, i) => t[k] === TAB[d][i])), 'parametros.js confere com a tabela do negócio (6 distribuidoras x 3 tipos)');
@@ -355,31 +356,128 @@ async function faturasReais() {
   base(w); delete w.pdfjsLib; await enviar(w); ok(/Não consegui ler a fatura/.test(txt(w, 'impStatus')), 'biblioteca de PDF indisponível: mensagem de erro');
   w.close();
 }
+/* ======================= I) TEMA CLARO/ESCURO ======================= */
+async function tema() {
+  section('I) Tema claro/escuro');
+  const T = w => w.document.documentElement.getAttribute('data-tema');
+  const mm = escuro => x => { x.matchMedia = q => ({ matches: escuro && /dark/.test(q), media: q, addEventListener() {}, removeEventListener() {} }); };
+  let w = await open('index.html'); ok(T(w) === 'claro', 'sem preferência do sistema: tema claro'); w.close();
+  w = await open('index.html', { beforeParse: mm(true) }); ok(T(w) === 'escuro', 'sistema em modo escuro: tema escuro'); w.close();
+  w = await open('index.html', { beforeParse(x) { mm(true)(x); x.localStorage.setItem('simuladores-tema', 'claro'); } }); ok(T(w) === 'claro', 'escolha salva vence a preferência do sistema'); w.close();
+  w = await open('index.html', { beforeParse(x) { mm(true)(x); x.localStorage.setItem('simuladores-tema', 'xyz'); } }); ok(T(w) === 'escuro', 'valor salvo inválido é ignorado'); w.close();
+  w = await open('index.html', { beforeParse(x) { Object.defineProperty(x, 'localStorage', { get() { throw new Error('SecurityError'); } }); } }); ok(!w.__errors.length && T(w) === 'claro', 'sem localStorage o tema funciona', w.__errors.join('|')); w.close();
+  w = await open('index.html', { beforeParse: mm(false) });
+  const b = $(w, 'tema');
+  ok(b.getAttribute('aria-pressed') === 'false' && /escuro/.test(b.title) && b.getAttribute('aria-label') === 'Alternar tema claro/escuro', 'botão do tema: rótulo acessível e dica "mudar para escuro"');
+  b.click(); ok(T(w) === 'escuro' && b.getAttribute('aria-pressed') === 'true' && /claro/.test(b.title), 'clicar alterna para escuro e atualiza o botão');
+  ok(w.localStorage.getItem('simuladores-tema') === 'escuro', 'a escolha é salva no navegador');
+  b.click(); ok(T(w) === 'claro', 'clicar de novo volta ao claro'); b.click();
+  w.document.querySelector('#nav a[data-k=consumo]').click(); await sleep(900); const f = $(w, 'frame').contentWindow;
+  ok(T(f) === 'escuro', 'simulador aberto recebe o tema escuro do menu', T(f));
+  b.click(); await sleep(250); ok(T(f) === 'claro', 'alternar no menu muda o tema do simulador aberto');
+  w.document.querySelector('#nav a[data-k=proposta]').click(); await sleep(900); ok(T($(w, 'frame').contentWindow) === 'claro', 'a aba de proposta também segue o tema'); w.close();
+  for (const pg of ['index', 'indicacao', 'consumo', 'proposta']) {
+    const h = fs.readFileSync(path.join(ROOT, pg + '.html'), 'utf8'), c = fs.readFileSync(path.join(ROOT, 'css', pg + '.css'), 'utf8');
+    ok(/css\/tema\.css/.test(h) && /js\/tema\.js/.test(h), pg + ': usa tema.css e tema.js'); ok(!/--bg\s*:/.test(c), pg + ': o css da página não redefine a paleta (vem de tema.css)');
+  }
+  const tc = fs.readFileSync(path.join(ROOT, 'css/tema.css'), 'utf8'), vars = t => [...t.matchAll(/(--[a-z]+):/g)].map(m => m[1]).sort().join(',');
+  const partes = tc.split(':root[data-tema="escuro"]'); ok(partes.length === 2 && vars(partes[0]) === vars(partes[1]) && vars(partes[0]).split(',').length >= 14, 'tema.css: claro e escuro definem exatamente as mesmas variáveis (' + vars(partes[0]).split(',').length + ')');
+}
+
+/* ======================= J) PROPOSTA DE OFERTA ======================= */
+async function proposta() {
+  section('J) Proposta de oferta (formulário, prévia, PDF e JPG)');
+  const w = await open('proposta.html'); ok(!w.__errors.length, 'carrega sem erros', w.__errors.join('|'));
+  const v = id => txt(w, id), d0 = new Date(), hojeISO = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
+  ok($(w, 'pData').value === hojeISO, 'data da proposta começa com a data de hoje');
+  ok($(w, 'pObs').value.startsWith('Sim, você receberá duas faturas') && $(w, 'pCargo').value === 'Consultora AXS Energia' && v('vB1') === '🌱 Energia Sustentável' && v('vB3') === '🔒 Sem fidelidade', 'textos padrão do modelo AXS');
+  ok(v('vCliente') === '' && v('vConsumo') === '' && v('vMensalidade') === '' && v('vEconomia') === '', 'valores em branco ficam vazios na prévia');
+  ok($(w, 'imgLogo').src.startsWith('data:image/png') && $(w, 'imgBanner').src.startsWith('data:image/jpeg'), 'logo e banner da AXS embutidos');
+  setv(w, 'pConsultor', '  Maria Souza '); setv(w, 'pCliente', 'João Silva'); setv(w, 'pUC', '123-4'); setv(w, 'pConsumo', 450); setv(w, 'pMensalidade', 389.9); setv(w, 'pEconomia', 1250); setv(w, 'pData', '2026-10-05');
+  ok(v('vConsultor') === 'Maria Souza' && v('vAssinatura') === 'Maria Souza', 'consultor na prévia e na assinatura (sem espaços sobrando)');
+  ok(v('vCliente') === 'João Silva' && v('vUC') === '123-4' && v('vData') === '05/10/2026', 'cliente, UC e data (dd/mm/aaaa)');
+  ok(v('vConsumo') === '450 kWh/mês' && /R\$\s?389,90/.test(v('vMensalidade')) && /R\$\s?1\.250,00/.test(v('vEconomia')), 'formatação de kWh e reais', v('vMensalidade') + ' | ' + v('vEconomia'));
+  setv(w, 'pConsumo', -5); setv(w, 'pMensalidade', 'abc'); ok(v('vConsumo') === '' && v('vMensalidade') === '', 'valor negativo ou inválido não aparece');
+  setv(w, 'pConsumo', 1234.5); ok(v('vConsumo') === '1.234,5 kWh/mês', 'consumo com milhar e decimal', v('vConsumo'));
+  setv(w, 'pObs', 'Linha 1\n\nLinha 2'); ok($(w, 'vObs').textContent === 'Linha 1\n\nLinha 2', 'observação mantém as quebras de linha');
+  setv(w, 'pB2', ''); ok(v('vB2') === '' && v('vB1') !== '', 'benefício em branco fica vazio (e é ocultado pelo css)');
+  const rapida = n => { $(w, 'pValidadeRapida').value = n; $(w, 'pValidadeRapida').dispatchEvent(new w.Event('change', { bubbles: true })); };
+  rapida('15'); ok($(w, 'pValidade').value === '20/10/2026' && v('vValidade') === '20/10/2026', 'validade rápida: 15 dias após 05/10/2026');
+  setv(w, 'pData', '2026-12-25'); rapida('7'); ok($(w, 'pValidade').value === '01/01/2027', 'validade rápida atravessa o fim do ano');
+  $(w, 'limpar').click();
+  ok($(w, 'pCliente').value === '' && $(w, 'pConsumo').value === '' && $(w, 'pValidade').value === '' && $(w, 'pUC').value === '' && v('vCliente') === '', 'limpar zera cliente, UC, validade e valores');
+  ok($(w, 'pConsultor').value.trim() === 'Maria Souza' && $(w, 'pObs').value.startsWith('Sim, você') && $(w, 'pData').value === hojeISO && v('vB2') === '✅ Sem taxa de adesão', 'limpar mantém o consultor e restaura textos, benefícios e data de hoje');
+  ok(JSON.parse(w.localStorage.getItem('simuladores-proposta-consultor')).nome === 'Maria Souza', 'consultor fica salvo neste navegador');
+  const capt = []; w.html2canvas = async (el, o) => { capt.push({ o, largura: el.style.width, id: el.id }); return { width: 2000, height: 3000, toDataURL: (t, q) => 'data:' + t + ';base64,AAA' + (q || '') }; };
+  const pdfs = []; w.jspdf = { jsPDF: class { constructor(o) { this.o = o; this.calls = []; pdfs.push(this); } addImage(...a) { this.calls.push(a); } save(n) { this.nome = n; } } };
+  const baixados = []; w.HTMLAnchorElement.prototype.click = function () { baixados.push({ nome: this.download, href: this.href }); };
+  setv(w, 'pCliente', 'João da Silva & Cia Ltda.'); setv(w, 'pConsumo', 300);
+  $(w, 'pdf').click(); await sleep(150);
+  ok(pdfs.length === 1 && pdfs[0].nome === 'proposta_axs_joao-da-silva-cia-ltda.pdf', 'PDF: nome do arquivo com o cliente (sem acentos/símbolos)', pdfs[0] && pdfs[0].nome);
+  ok(pdfs[0].o.format[0] === 210 && Math.abs(pdfs[0].o.format[1] - 315) < 0.01 && pdfs[0].calls[0][1] === 'JPEG', 'PDF: largura A4 (210 mm), altura proporcional ao conteúdo e imagem JPEG (arquivo leve)');
+  ok(capt[0].largura === '1000px' && capt[0].id === '' && capt[0].o.scale === 2, 'exportação usa cópia da folha com 1000px, sem ids repetidos, escala 2');
+  ok(!w.document.querySelector('.palco-export') && !$(w, 'pdf').disabled, 'cópia temporária removida e botões liberados');
+  $(w, 'jpg').click(); await sleep(150);
+  ok(baixados.length === 1 && baixados[0].nome === 'proposta_axs_joao-da-silva-cia-ltda.jpg' && /^data:image\/jpeg/.test(baixados[0].href), 'JPG: nome do arquivo e dados da imagem'); ok(/JPG gerado/.test(txt(w, 'msg')), 'mensagem de sucesso');
+  setv(w, 'pCliente', ''); $(w, 'jpg').click(); await sleep(150); ok(baixados[1].nome === 'proposta_axs.jpg', 'sem cliente: nome padrão proposta_axs');
+  w.html2canvas = async () => { throw new Error('falhou'); }; $(w, 'pdf').click(); await sleep(150); ok(/Não foi possível gerar/.test(txt(w, 'msg')) && !$(w, 'pdf').disabled, 'falha na geração: mensagem e botões liberados');
+  delete w.html2canvas; $(w, 'jpg').click(); await sleep(150); ok(/não carregada/.test(txt(w, 'msg')), 'biblioteca ausente: mensagem clara');
+  w.close();
+  // aviso ao menu (contagem de propostas)
+  const h = await open('index.html', { hash: '#proposta' }); const msgs = []; h.postMessage = m => msgs.push(m); await sleep(800);
+  const c = $(h, 'frame').contentWindow; c.html2canvas = async () => ({ width: 10, height: 10, toDataURL: () => 'data:image/png;base64,AA' }); c.jspdf = { jsPDF: class { addImage() {} save() {} } };
+  c.document.getElementById('pdf').click(); await sleep(250); ok(msgs.some(m => m.tipo === 'proposta' && m.formato === 'pdf'), 'proposta gerada dentro do menu avisa o menu'); h.close();
+  const solo = await open('proposta.html'); const m2 = []; solo.postMessage = m => m2.push(m); solo.html2canvas = async () => ({ width: 10, height: 10, toDataURL: () => 'data:image/png;base64,AA' }); solo.jspdf = { jsPDF: class { addImage() {} save() {} } };
+  solo.document.getElementById('pdf').click(); await sleep(250); ok(!m2.length, 'fora do menu nenhuma mensagem é enviada'); solo.close();
+  const base = path.join(ROOT, 'js/proposta-imagens.js'), im = fs.readFileSync(base, 'utf8'); ok(/logo: "data:image\/png;base64,/.test(im) && /banner: "data:image\/jpeg;base64,/.test(im) && fs.statSync(base).size < 600000, 'imagens embutidas e leves (banner em JPEG)');
+}
+
+/* ======================= K) LAYOUT (imagem de referência) ======================= */
+async function layoutConsumo() {
+  section('K) Layout: 3 colunas do simulador de consumo e padrão das demais telas');
+  const w = await open('consumo.html'), d = w.document;
+  ok([...d.querySelectorAll('.layout > section')].map(x => x.className).join() === 'col-a,col-b,col-c', 'três colunas: col-a, col-b e col-c');
+  const tit = c => [...d.querySelectorAll('.' + c + ' > .card')].map(x => x.querySelector('summary,h2').textContent.replace(/\s+/g, ' ').trim());
+  ok(tit('col-a').map(t => t.slice(0, 12)).join('|') === 'Importar fat|Ar-condicion|Outros produ|Cliente poss', 'coluna 1: importar fatura, ar-condicionado, outros produtos e geração/injeção', tit('col-a').join('|'));
+  ok(tit('col-b')[0] === 'Dados do lead' && !!d.querySelector('.col-b #months') && !!d.querySelector('.col-b #limpar') && !!d.querySelector('.col-b #dist'), 'coluna 2: dados do lead (distribuidora, tipo, meses e botão limpar)');
+  ok(tit('col-c')[0] === 'Resultado' && /Parâmetros de atendimento/.test(tit('col-c')[1]) && !!d.querySelector('.col-c #status') && !!d.querySelector('.col-c #limiar'), 'coluna 3: resultado (com o limite de alerta) e parâmetros');
+  const aberto = c => [...d.querySelectorAll('.' + c + ' > .card > details')].map(x => x.open ? 1 : 0).join('');
+  ok(aberto('col-a') === '1001' && aberto('col-c') === '0', 'abertura inicial como na imagem: importar e geração abertos; AC, produtos e parâmetros recolhidos', aberto('col-a') + '/' + aberto('col-c'));
+  ok(!!d.querySelector('header h1') && /Validador de lead/.test(d.querySelector('header h1').textContent) && !!d.querySelector('.hint'), 'faixa de título e texto de apoio no topo');
+  const css = fs.readFileSync(path.join(ROOT, 'css/consumo.css'), 'utf8');
+  ok(/repeat\(3,minmax\(0,370px\)\)/.test(css) && /max-width:1400px/.test(css) && /justify-content:space-between/.test(css), 'css: grade de 3 colunas de 370px em container de até 1400px');
+  ok(/@media\(max-width:1180px\)/.test(css) && /@media\(max-width:720px\)/.test(css), 'css: 2 colunas em telas médias e 1 coluna no celular');
+  const ci = fs.readFileSync(path.join(ROOT, 'css/index.css'), 'utf8'); ok(/grid-template-columns:1fr auto 1fr/.test(ci) && /\.nav-links\{display:flex;gap:4px;justify-content:center\}/.test(ci), 'menu: links centralizados, tema e versão à direita');
+  for (const pg of ['indicacao', 'proposta']) { const x = await open(pg + '.html'); ok(!!x.document.querySelector('header h1') && !!x.document.querySelector('.hint'), pg + ': faixa de título e texto de apoio como nas demais telas'); x.close(); }
+  w.close();
+}
+
 /* ======================= F) MENU/HUB, ESTATÍSTICAS E RASTREIO ======================= */
 async function hub() {
   section('F) Menu, navegação, estatísticas e contagem');
   let w = await open('index.html'); ok(!w.__errors.length, 'menu carrega sem erros', w.__errors.join('|'));
   const est = () => [...w.document.querySelectorAll('#nav a')].map(a => a.dataset.k + (a.classList.contains('ativo') ? '*' : '')).join(' ');
   const clica = async k => { w.document.querySelector('#nav a[data-k=' + k + ']').click(); await sleep(60); };
-  ok(est() === 'inicio* indicacao consumo' && !$(w, 'menu').classList.contains('oculto'), 'início: página principal ativa');
-  ok([...w.document.querySelectorAll('#nav a')].map(a => a.textContent).join('|') === 'Página principal|Simulação de indicação|Simulação de consumo de energia', 'barra: os 3 itens pedidos');
+  ok(est() === 'inicio* indicacao consumo proposta' && !$(w, 'menu').classList.contains('oculto'), 'início: página principal ativa');
+  ok([...w.document.querySelectorAll('#nav a')].map(a => a.textContent).join('|') === 'Página principal|Simulação de indicação|Simulação de consumo de energia|Proposta de oferta', 'barra: os 4 itens (início, indicação, consumo e proposta)');
   const VV = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(VV);
   ok(txt(w, 'versaoNav') === 'v' + VV.VERSAO.numero && txt(w, 'versao').includes('Versão ' + VV.VERSAO.numero), 'versão exibida na barra e no rodapé do menu', txt(w, 'versaoNav') + ' / ' + txt(w, 'versao'));
-  await clica('indicacao'); ok(est() === 'inicio indicacao* consumo' && $(w, 'frame').getAttribute('src') === 'indicacao.html' && $(w, 'menu').classList.contains('oculto'), 'ir para indicação');
-  await clica('consumo'); ok(est() === 'inicio indicacao consumo*' && $(w, 'frame').getAttribute('src') === 'consumo.html', 'ir para consumo');
-  await clica('inicio'); ok(est() === 'inicio* indicacao consumo' && !$(w, 'frame').hasAttribute('src'), 'voltar à página principal libera o iframe');
-  w.document.querySelector('.opt[data-k=consumo]').click(); await sleep(60); ok(est() === 'inicio indicacao consumo*', 'cartão do menu abre o simulador');
-  w.history.back(); await sleep(120); ok(est() === 'inicio* indicacao consumo', 'botão voltar do navegador funciona', est());
+  await clica('indicacao'); ok(est() === 'inicio indicacao* consumo proposta' && $(w, 'frame').getAttribute('src') === 'indicacao.html' && $(w, 'menu').classList.contains('oculto'), 'ir para indicação');
+  await clica('consumo'); ok(est() === 'inicio indicacao consumo* proposta' && $(w, 'frame').getAttribute('src') === 'consumo.html', 'ir para consumo');
+  await clica('inicio'); ok(est() === 'inicio* indicacao consumo proposta' && !$(w, 'frame').hasAttribute('src'), 'voltar à página principal libera o iframe');
+  w.document.querySelector('.opt[data-k=consumo]').click(); await sleep(60); ok(est() === 'inicio indicacao consumo* proposta', 'cartão do menu abre o simulador');
+  w.history.back(); await sleep(120); ok(est() === 'inicio* indicacao consumo proposta', 'botão voltar do navegador funciona', est());
   ok(w.document.querySelector('#nav a.ativo').getAttribute('aria-current') === 'page', 'item ativo tem aria-current'); w.close();
-  w = await open('index.html', { hash: '#consumo' }); ok(est() === 'inicio indicacao consumo*', 'link direto #consumo abre o simulador'); w.close();
-  w = await open('index.html', { hash: '#qualquercoisa' }); ok(est() === 'inicio* indicacao consumo', 'hash inválido cai na página principal'); w.close();
+  w = await open('index.html', { hash: '#consumo' }); ok(est() === 'inicio indicacao consumo* proposta', 'link direto #consumo abre o simulador'); w.close();
+  w = await open('index.html', { hash: '#qualquercoisa' }); ok(est() === 'inicio* indicacao consumo proposta', 'hash inválido cai na página principal'); w.close();
   w = await open('index.html'); ok($(w, 'stats').hidden, 'sem código GoatCounter o painel de uso fica oculto'); ok(!w.document.querySelector('script[src*="goatcounter"]'), 'sem código GoatCounter nenhum script externo é carregado'); w.close();
   // com GoatCounter configurado (rede simulada)
   const calls = [];
-  const mock = u => Promise.resolve({ ok: !String(u).includes('falha'), json: () => Promise.resolve(String(u).includes('worker.test') ? [{ name: 'Brasil', count: 50 }, { name: '<b>X</b>', count: 7 }, { name: 'C', count: 6 }, { name: 'D', count: 5 }, { name: 'E', count: 4 }, { name: 'F', count: 3 }] : String(u).includes('simulacao-indicacao') ? { count: '1,234' } : String(u).includes('simulacao-consumo') ? { count: '66' } : { count: '9,999' }) });
+  const mock = u => Promise.resolve({ ok: !String(u).includes('falha'), json: () => Promise.resolve(String(u).includes('worker.test') ? [{ name: 'Brasil', count: 50 }, { name: '<b>X</b>', count: 7 }, { name: 'C', count: 6 }, { name: 'D', count: 5 }, { name: 'E', count: 4 }, { name: 'F', count: 3 }] : String(u).includes('proposta-gerada') ? { count: '12' } : String(u).includes('simulacao-indicacao') ? { count: '1,234' } : String(u).includes('simulacao-consumo') ? { count: '66' } : { count: '9,999' }) });
   w = await open('index.html', { over: { 'config.js': "window.CONFIG={goatcounter:'teste',locationsUrl:'https://worker.test/top'};" }, beforeParse(x) { x.fetch = mock; } });
   ok(!!w.document.querySelector('script[src*="gc.zgo.at"]') && w.document.querySelector('script[src*="gc.zgo.at"]').getAttribute('data-goatcounter') === 'https://teste.goatcounter.com/count', 'script do GoatCounter com a URL correta');
   await sleep(1900); ok(!$(w, 'stats').hidden, 'painel de uso visível'); ok(num(txt(w, 'kAcessos')) === 9999, 'acessos exibidos (9.999)', txt(w, 'kAcessos')); ok(num(txt(w, 'kSims')) === 1300 && /1\.234/.test(txt(w, 'kSimsDet')), 'simulações = indicação + consumo (1.234 + 66)', txt(w, 'kSims') + ' ' + txt(w, 'kSimsDet'));
+  ok(num(txt(w, 'kProps')) === 12, 'propostas geradas exibidas (12)', txt(w, 'kProps'));
   const li = [...w.document.querySelectorAll('#top5 li')]; ok(li.length === 5 && /Brasil/.test(li[0].textContent), 'Top 5 localidades limitado a 5 itens'); ok(!w.document.querySelector('#top5 b b') && !/<b>/.test(li[1] ? li[1].innerHTML.replace(/<span>.*?<\/span>|<b>[^<]*<\/b>/g, '') : ''), 'nome de localidade é escapado (sem HTML injetado)');
   w.goatcounter = { count: o => calls.push(o) }; const fr = $(w, 'frame').contentWindow || w;
   w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'simulacao', ferramenta: 'indicacao' }, source: w })); await sleep(30); ok(calls.length === 0, 'mensagem que não vem do iframe é ignorada');
@@ -387,6 +485,7 @@ async function hub() {
   w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'simulacao', ferramenta: 'indicacao' }, source: src })); await sleep(700);
   ok(calls.length === 1 && calls[0].path === '/simulacao-indicacao' && calls[0].event === true, 'mensagem do iframe registra evento /simulacao-indicacao', JSON.stringify(calls));
   w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'simulacao', ferramenta: 'inexistente' }, source: src })); await sleep(700); ok(calls.length === 1, 'ferramenta desconhecida é ignorada');
+  w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'proposta', formato: 'pdf' }, source: src })); await sleep(700); ok(calls.length === 2 && calls[1].path === '/proposta-gerada' && calls[1].event === true, 'proposta gerada registra evento /proposta-gerada', JSON.stringify(calls[1]));
   w.close();
   // não contar as próprias visitas
   w = await open('index.html', { query: '?contar=nao', over: { 'config.js': "window.CONFIG={goatcounter:'teste'};" }, beforeParse(x) { x.fetch = mock; } });
@@ -399,7 +498,7 @@ async function hub() {
 
 async function rastreio() {
   section('G) Contagem de simulações (rastreio.js dentro do menu)');
-  const w = await open('index.html'); const msgs = []; w.postMessage = (m) => msgs.push(m);
+  const w = await open('index.html'); const msgs = []; w.postMessage = (m) => { if (m && m.tipo === 'simulacao') msgs.push(m); };   // ignora os pedidos de tema que o simulador também envia
   w.document.querySelector('.opt[data-k=indicacao]').click(); await sleep(500); let c = $(w, 'frame').contentWindow;
   const sv = (id, v) => { const e = c.document.getElementById(id); e.value = v; e.dispatchEvent(new c.Event('input', { bubbles: true })); };
   sv('fInd', 100); sv('fInv', 300); await sleep(4400); ok(msgs.length === 1 && msgs[0].ferramenta === 'indicacao' && msgs[0].tipo === 'simulacao', 'indicação: resultado estável por 4s conta 1 simulação', JSON.stringify(msgs));
@@ -416,7 +515,7 @@ async function rastreio() {
 
 (async () => {
   const t0 = Date.now();
-  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
+  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
   console.log('\n' + '='.repeat(60) + `\nAprovados: ${pass}   Reprovados: ${fail}   Avisos: ${warns.length}   (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('\nFALHAS:'); fails.forEach(f => console.log(' x ' + f)); }
   if (warns.length) { console.log('\nAVISOS:'); [...new Set(warns)].forEach(f => console.log(' ! ' + f)); }

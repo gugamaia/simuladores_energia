@@ -10,6 +10,26 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.1.0] - 2026-10-06
+Nova aba de proposta, tema claro/escuro e layout em 3 colunas conforme a imagem de referência. Validada por 529 testes automatizados e 13 testes em Chromium real (layout, tema e geração de PDF/JPG).
+
+### Adicionado
+- **Aba "Proposta de oferta":** formulário manual (consultor, cliente, data, validade com atalho de 7/15/30 dias, UC, consumo médio previsto, mensalidade AXS, economia anual, observação, cargo e benefícios) com prévia fiel ao modelo da AXS Energia e download em **PDF** ou **JPG**. Arquivo nomeado com o cliente (`proposta_axs_nome-do-cliente.pdf`); consultor lembrado neste navegador; botão para limpar campos.
+- **Tema claro/escuro:** botão na barra superior; segue a preferência do sistema na primeira visita, guarda a escolha e vale também dentro dos simuladores. Cores centralizadas em `css/tema.css`.
+- **Propostas geradas** no painel de uso (evento `/proposta-gerada` no GoatCounter).
+- Teste em navegador real (`tests/navegador.js`, opcional) que confere o layout, o tema e a geração de PDF/JPG.
+
+### Alterado
+- **Simulador de consumo em 3 colunas**, como na imagem de referência: (1) importar fatura, ar-condicionado, outros produtos e geração/injeção; (2) dados do lead; (3) resultado e parâmetros. Abre com importar fatura e geração expandidos e ar-condicionado, outros produtos e parâmetros recolhidos. Em telas médias vira 2 colunas e no celular 1 coluna (dados do lead primeiro).
+- **Barra superior:** links centralizados, com o botão de tema e a versão à direita, e quarta aba "Proposta de oferta". Ela agora acompanha a rolagem do menu.
+- Tela de indicação com a mesma faixa de título das demais.
+- Menu inicial com três cartões (indicação, consumo e proposta).
+- Bibliotecas de exportação (html2canvas e jsPDF) e a fonte Montserrat hospedadas no próprio site; imagens da proposta embutidas, então o PDF/JPG funciona também com o arquivo aberto direto do computador.
+
+### Corrigido
+- PDF da proposta gerado com imagem JPEG: cerca de 0,7 MB em vez de ~27 MB do modelo original (PNG).
+- Barra superior não acompanhava a rolagem do menu inicial.
+
 ## [1.0.0] - 2026-10-05
 Primeira versão oficial, validada por 409 testes automatizados (incluindo faturas reais anonimizadas).
 

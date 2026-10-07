@@ -1,0 +1,54 @@
+/* tokens de cor e tema: css/tema.css */
+@font-face{font-family:'Montserrat';src:url('../fonts/montserrat-latin-wght-normal.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:swap}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,Arial,sans-serif}
+header{background:var(--head);color:#fff;text-align:center;padding:16px}
+header h1{margin:0;font-size:1.25rem}
+main{max-width:1400px;margin:0 auto;padding:16px}
+.hint{color:var(--mute);font-style:italic;text-align:center;max-width:760px;margin:0 auto 16px}
+.layout{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:24px;align-items:start}
+@media(max-width:1000px){.layout{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+h2{font-size:1rem;margin:0 0 12px}
+details summary{cursor:pointer;font-weight:600}
+label{display:block;font-weight:600;font-size:.9rem;margin:10px 0 4px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--in);color:var(--ink);font:inherit}
+textarea{resize:vertical}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.legend{font-size:.85rem;color:var(--mute);margin:8px 0 0}
+.acoes{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.acoes .legend{flex-basis:100%;margin:4px 0 0}
+.btn{padding:9px 16px;border:0;border-radius:8px;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:wait}
+.btn-pdf{background:#dc2626}.btn-jpg{background:#2563eb}.btn-limpar{background:#0f766e}
+.prev-wrap{position:relative;overflow:hidden;border-radius:10px}
+.palco-export{position:fixed;left:-10000px;top:0;width:1000px}
+
+/* ===== Folha da proposta (sempre clara, igual ao modelo da AXS) ===== */
+.px{width:1000px;transform-origin:top left;background:#fff;border-radius:22px;overflow:hidden;font-family:'Montserrat',Arial,sans-serif;color:#061532;line-height:normal}
+.px *{box-sizing:border-box}
+.px-proposal{padding:24px 24px 18px;background:#fff}
+.px-header{display:flex;align-items:center;gap:22px;background:linear-gradient(135deg,#f8fafc 0%,#ecfdf5 100%);border:1px solid #dbeafe;border-radius:18px;padding:20px;margin-bottom:20px}
+.px-logo{width:150px;min-width:150px;height:150px;background:#f7f7f7;display:flex;align-items:center;justify-content:center}
+.px-logo img{width:115px;height:auto;display:block}
+.px-header-fields{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.px-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.px-field{background:#fff;border:1px solid #dbe3ef;border-radius:16px;padding:15px 18px;box-shadow:0 5px 16px rgba(15,23,42,.05)}
+.px-label{font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px}
+.px-value{font-size:19px;font-weight:800;color:#10b981;min-height:24px;word-break:break-word}
+.px-title{margin:16px 0 22px;text-align:center;font-size:34px;font-weight:800;letter-spacing:-.7px;color:#061532}
+.px-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.px-card{border:1px solid #dbe3ef;border-radius:18px;padding:20px;background:#fff;box-shadow:0 5px 16px rgba(15,23,42,.04)}
+.px-icon{width:44px;height:44px;background:#ecfdf5;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:14px}
+.px-card-title{font-size:15px;font-weight:800;margin-bottom:9px}
+.px-card-value{font-size:30px;line-height:1;font-weight:800;color:#10b981;min-height:30px}
+.px-obs{background:#f8fafc;border-left:5px solid #10b981;border-radius:14px;padding:18px 20px;font-size:13.2px;line-height:1.55;color:#334155;margin-bottom:16px}
+.px-obs strong{color:#0f172a}
+.px-obs span{white-space:pre-line}
+.px-signature{margin:16px 0;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,#f8fafc 0%,#ecfdf5 100%);border:1px solid #dbe3ef;color:#0f172a;font-size:13px;line-height:1.45}
+.px-signature-name{display:inline-block;min-height:20px;font-size:18px;font-weight:800;color:#10b981;margin-top:4px}
+.px-benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.px-benefit{border:1px solid #dbe3ef;border-radius:14px;padding:12px;text-align:center;font-size:13px;font-weight:800;color:#475569;background:#fff}
+.px-benefit:empty{display:none}
+.px-banner{width:100%;background:#061532}
+.px-banner img{width:100%;display:block;height:auto}
