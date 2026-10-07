@@ -27,7 +27,8 @@ const servidor = http.createServer((req, res) => {
   const ver = await caixa(p.locator('#versaoNav')); ok(ver.x > 1450, 'barra: versão à direita', String(Math.round(ver.x)));
   // 2) tema
   const fundo = async () => f.locator('body').evaluate(e => getComputedStyle(e).backgroundColor);
-  const escuro = await fundo(); await p.click('#tema'); await p.waitForTimeout(400); const claro = await fundo();
+  const escuro = await fundo(); const k0 = (await caixa(p.locator('.chave-bolinha'))).x; await p.click('.chave'); await p.waitForTimeout(400); const claro = await fundo(); const k1 = (await caixa(p.locator('.chave-bolinha'))).x;
+  ok(k0 - k1 > 15, 'chave de tema: a bolinha se move ao alternar', k0 + ' -> ' + k1);
   ok(escuro === 'rgb(15, 22, 28)' && claro === 'rgb(243, 245, 247)', 'tema: escuro e claro aplicados dentro do simulador', escuro + ' / ' + claro);
   ok(await p.locator('html').getAttribute('data-tema') === 'claro', 'tema: menu em modo claro');
   await p.context().close();
@@ -47,6 +48,11 @@ const servidor = http.createServer((req, res) => {
   const buf = fs.readFileSync(jpg); ok(buf[0] === 0xff && buf[1] === 0xd8 && d2.suggestedFilename().endsWith('.jpg'), 'proposta: JPG válido');
   let i = 2, w = 0, h = 0; while (i < buf.length) { if (buf[i] !== 0xff) break; const m = buf[i + 1], len = buf.readUInt16BE(i + 2); if (m >= 0xc0 && m <= 0xc3) { h = buf.readUInt16BE(i + 5); w = buf.readUInt16BE(i + 7); break; } i += 2 + len; }
   ok(w === 2000 && h > 3000, 'proposta: JPG com 2000 px de largura (folha de 1000 px, escala 2)', w + 'x' + h);
+  // assinatura: com o nome em branco continua havendo espaço entre "Atenciosamente," e o cargo
+  await f.locator('summary', { hasText: 'Textos e benef' }).click(); await f.locator('#pConsultor').fill(''); await f.locator('#pCargo').fill('Consultor AXS Energia'); await p.waitForTimeout(300);
+  const tAt = await caixa(f.locator('.px-signature > div').first()), tCargo = await caixa(f.locator('#vCargo'));
+  ok(tCargo.y - (tAt.y + tAt.height) >= 55, 'proposta: espaço livre para o nome entre "Atenciosamente," e o cargo', String(Math.round(tCargo.y - (tAt.y + tAt.height))));
+  await f.locator('.px-signature').scrollIntoViewIfNeeded(); await p.screenshot({ path: '/tmp/_assinatura.png' });
   await p.context().close();
   ok(!erros.length, 'nenhum erro de script no navegador', erros.join(' | '));
   await b.close(); servidor.close();

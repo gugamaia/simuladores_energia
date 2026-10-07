@@ -9,13 +9,8 @@ const $ = id => document.getElementById(id);
 
 /* ---- Tema claro/escuro (js/tema.js) ---- */
 function enviarTema(){ const f = $('frame').contentWindow; if(f) f.postMessage({tipo:'tema', tema:Tema.atual()}, '*'); }
-function pintarTema(){
-  const escuro = Tema.atual() === 'escuro', b = $('tema');
-  b.innerHTML = escuro ? '&#9728;' : '&#127769;';
-  b.title = escuro ? 'Mudar para o tema claro' : 'Mudar para o tema escuro';
-  b.setAttribute('aria-pressed', escuro ? 'true' : 'false');
-}
-$('tema').addEventListener('click', ()=>{ Tema.alternar(); pintarTema(); enviarTema(); });
+function pintarTema(){ $('tema').checked = Tema.atual() === 'escuro'; }   // chave ligada = tema escuro
+$('tema').addEventListener('change', ()=>{ Tema.definir($('tema').checked ? 'escuro' : 'claro', true); enviarTema(); });
 $('frame').addEventListener('load', enviarTema);
 pintarTema();
 

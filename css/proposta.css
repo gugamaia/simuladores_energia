@@ -46,7 +46,8 @@ textarea{resize:vertical}
 .px-obs strong{color:#0f172a}
 .px-obs span{white-space:pre-line}
 .px-signature{margin:16px 0;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,#f8fafc 0%,#ecfdf5 100%);border:1px solid #dbe3ef;color:#0f172a;font-size:13px;line-height:1.45}
-.px-signature-name{display:inline-block;min-height:20px;font-size:18px;font-weight:800;color:#10b981;margin-top:4px}
+/* espaço reservado entre "Atenciosamente," e o cargo para o nome do consultor (digitado ou escrito à mão) */
+.px-signature-name{display:flex;align-items:flex-end;min-height:64px;margin:4px 0 2px;font-size:18px;font-weight:800;color:#10b981}
 .px-benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .px-benefit{border:1px solid #dbe3ef;border-radius:14px;padding:12px;text-align:center;font-size:13px;font-weight:800;color:#475569;background:#fff}
 .px-benefit:empty{display:none}

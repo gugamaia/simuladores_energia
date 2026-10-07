@@ -10,6 +10,14 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.1.2] - 2026-10-06
+### Corrigido
+- **Proposta:** o espaço entre "Atenciosamente," e o cargo do consultor ficava pequeno quando o nome estava em branco. Agora há um **espaço reservado de 64 px** para o consultor colocar o nome (digitado no campo "Consultor(a)" ou escrito à mão depois de imprimir), na prévia, no PDF e no JPG.
+
+## [1.1.1] - 2026-10-06
+### Corrigido
+- **Seletor de tema:** faltava uma opção clara para escolher o tema. O botão com ícone foi substituído por uma **chave (switch) Claro / Escuro** na barra superior, com o lado ativo destacado, acessível por teclado e leitor de tela (`role="switch"`). Em telas estreitas aparecem só os ícones.
+
 ## [1.1.0] - 2026-10-06
 Nova aba de proposta, tema claro/escuro e layout em 3 colunas conforme a imagem de referência. Validada por 529 testes automatizados e 13 testes em Chromium real (layout, tema e geração de PDF/JPG).
 

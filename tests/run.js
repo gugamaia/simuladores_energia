@@ -362,16 +362,17 @@ async function tema() {
   const T = w => w.document.documentElement.getAttribute('data-tema');
   const mm = escuro => x => { x.matchMedia = q => ({ matches: escuro && /dark/.test(q), media: q, addEventListener() {}, removeEventListener() {} }); };
   let w = await open('index.html'); ok(T(w) === 'claro', 'sem preferência do sistema: tema claro'); w.close();
-  w = await open('index.html', { beforeParse: mm(true) }); ok(T(w) === 'escuro', 'sistema em modo escuro: tema escuro'); w.close();
+  w = await open('index.html', { beforeParse: mm(true) }); ok(T(w) === 'escuro' && $(w, 'tema').checked, 'sistema em modo escuro: tema escuro e chave ligada'); w.close();
   w = await open('index.html', { beforeParse(x) { mm(true)(x); x.localStorage.setItem('simuladores-tema', 'claro'); } }); ok(T(w) === 'claro', 'escolha salva vence a preferência do sistema'); w.close();
   w = await open('index.html', { beforeParse(x) { mm(true)(x); x.localStorage.setItem('simuladores-tema', 'xyz'); } }); ok(T(w) === 'escuro', 'valor salvo inválido é ignorado'); w.close();
   w = await open('index.html', { beforeParse(x) { Object.defineProperty(x, 'localStorage', { get() { throw new Error('SecurityError'); } }); } }); ok(!w.__errors.length && T(w) === 'claro', 'sem localStorage o tema funciona', w.__errors.join('|')); w.close();
   w = await open('index.html', { beforeParse: mm(false) });
   const b = $(w, 'tema');
-  ok(b.getAttribute('aria-pressed') === 'false' && /escuro/.test(b.title) && b.getAttribute('aria-label') === 'Alternar tema claro/escuro', 'botão do tema: rótulo acessível e dica "mudar para escuro"');
-  b.click(); ok(T(w) === 'escuro' && b.getAttribute('aria-pressed') === 'true' && /claro/.test(b.title), 'clicar alterna para escuro e atualiza o botão');
+  ok(b.type === 'checkbox' && b.getAttribute('role') === 'switch' && !b.checked && /tema escuro/i.test(b.getAttribute('aria-label')), 'tema é uma chave (switch) acessível, desligada no tema claro');
+  ok(/Claro/.test(w.document.querySelector('.lado-claro').textContent) && /Escuro/.test(w.document.querySelector('.lado-escuro').textContent), 'chave mostra as opções Claro e Escuro');
+  b.click(); ok(T(w) === 'escuro' && b.checked, 'ligar a chave muda para o tema escuro');
   ok(w.localStorage.getItem('simuladores-tema') === 'escuro', 'a escolha é salva no navegador');
-  b.click(); ok(T(w) === 'claro', 'clicar de novo volta ao claro'); b.click();
+  b.click(); ok(T(w) === 'claro', 'desligar a chave volta ao tema claro'); b.click();
   w.document.querySelector('#nav a[data-k=consumo]').click(); await sleep(900); const f = $(w, 'frame').contentWindow;
   ok(T(f) === 'escuro', 'simulador aberto recebe o tema escuro do menu', T(f));
   b.click(); await sleep(250); ok(T(f) === 'claro', 'alternar no menu muda o tema do simulador aberto');
@@ -429,6 +430,9 @@ async function proposta() {
   c.document.getElementById('pdf').click(); await sleep(250); ok(msgs.some(m => m.tipo === 'proposta' && m.formato === 'pdf'), 'proposta gerada dentro do menu avisa o menu'); h.close();
   const solo = await open('proposta.html'); const m2 = []; solo.postMessage = m => m2.push(m); solo.html2canvas = async () => ({ width: 10, height: 10, toDataURL: () => 'data:image/png;base64,AA' }); solo.jspdf = { jsPDF: class { addImage() {} save() {} } };
   solo.document.getElementById('pdf').click(); await sleep(250); ok(!m2.length, 'fora do menu nenhuma mensagem é enviada'); solo.close();
+  const css = fs.readFileSync(path.join(ROOT, 'css/proposta.css'), 'utf8'), ms = css.match(/\.px-signature-name\{[^}]*min-height:(\d+)px/);
+  ok(!!ms && +ms[1] >= 48, 'assinatura: espaço reservado de pelo menos 48 px para o nome do consultor', ms ? ms[1] + 'px' : 'sem regra');
+  const sg = (await open('proposta.html')); const ass = sg.document.querySelector('.px-signature'); ok([...ass.children].map(e => e.id || 'texto').join() === 'texto,vAssinatura,vCargo' && sg.document.getElementById('vAssinatura').textContent === '', 'assinatura: "Atenciosamente", espaço do nome (vazio) e cargo, nessa ordem'); sg.close();
   const base = path.join(ROOT, 'js/proposta-imagens.js'), im = fs.readFileSync(base, 'utf8'); ok(/logo: "data:image\/png;base64,/.test(im) && /banner: "data:image\/jpeg;base64,/.test(im) && fs.statSync(base).size < 600000, 'imagens embutidas e leves (banner em JPEG)');
 }
 

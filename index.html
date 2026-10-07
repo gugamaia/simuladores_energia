@@ -19,7 +19,12 @@
       <a href="#proposta" data-k="proposta">Proposta de oferta</a>
     </div>
     <div class="nav-dir">
-      <button id="tema" class="tema" type="button" aria-label="Alternar tema claro/escuro"></button>
+      <label class="chave" title="Alternar entre tema claro e escuro">
+        <span class="chave-lado lado-claro"><span aria-hidden="true">&#9728;</span><span class="chave-txt">Claro</span></span>
+        <input type="checkbox" id="tema" role="switch" aria-label="Tema escuro">
+        <span class="chave-trilho" aria-hidden="true"><span class="chave-bolinha"></span></span>
+        <span class="chave-lado lado-escuro"><span aria-hidden="true">&#127769;</span><span class="chave-txt">Escuro</span></span>
+      </label>
       <span class="versao" id="versaoNav"></span>
     </div>
   </nav>

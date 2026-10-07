@@ -39,9 +39,19 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
 #nav a.ativo{color:var(--acc);background:var(--card);font-weight:600}
 #nav a:focus-visible{outline:2px solid var(--acc)}
 .nav-dir{justify-self:end;display:flex;align-items:center;gap:6px}
-.tema{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:1rem;line-height:1}
-.tema:hover,.tema:focus-visible{border-color:var(--acc);outline:2px solid var(--acc)}
-@media(max-width:900px){#nav{grid-template-columns:1fr auto}.nav-esq{display:none}.nav-links{grid-column:1/-1;grid-row:2;overflow-x:auto;justify-content:flex-start}.nav-dir{grid-column:2;grid-row:1}}
+/* chave (switch) de tema: ligada = escuro */
+.chave{position:relative;display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:.8rem;user-select:none}
+.chave input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.chave-lado{display:inline-flex;align-items:center;gap:4px;color:var(--mute);font-weight:600}   /* negrito fixo: a chave não "pula" ao alternar */
+.lado-claro{color:var(--ink)}
+:root[data-tema="escuro"] .lado-claro{color:var(--mute)}
+:root[data-tema="escuro"] .lado-escuro{color:var(--ink)}
+.chave-trilho{position:relative;width:42px;height:22px;border-radius:999px;background:var(--mute);transition:background .2s}
+.chave-bolinha{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .2s}
+.chave input:checked + .chave-trilho{background:var(--acc)}
+.chave input:checked + .chave-trilho .chave-bolinha{transform:translateX(20px)}
+.chave input:focus-visible + .chave-trilho{outline:2px solid var(--acc);outline-offset:2px}
+@media(max-width:900px){#nav{grid-template-columns:1fr auto}.nav-esq{display:none}.nav-links{grid-column:1/-1;grid-row:2;overflow-x:auto;justify-content:flex-start}.nav-dir{grid-column:2;grid-row:1}.chave-txt{display:none}}
 
 /* versao */
 #nav .versao{padding:0 4px;color:var(--mute);font-size:.8rem;white-space:nowrap}
