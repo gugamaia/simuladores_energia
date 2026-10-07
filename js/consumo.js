@@ -16,16 +16,20 @@ function sanear(p){
   return Object.keys(out).length ? out : null;
 }
 const KEY = 'validador-lead-params-v2', ACKEY = 'validador-lead-ac-v2';
+/* Custo de disponibilidade (kWh/mês por tipo): descontado de cada mês na energia compartilhada estimada */
+function saneDisp(d){ return d && typeof d === 'object' && TIPOS.every(k=>Number.isFinite(d[k]) && d[k] >= 0) ? {"Monofásico":d["Monofásico"],"Bifásico":d["Bifásico"],"Trifásico":d["Trifásico"]} : null; }
+const DISP_PADRAO = saneDisp(P.disponibilidade) || {"Monofásico":30,"Bifásico":50,"Trifásico":100};
+let DISP = JSON.parse(JSON.stringify(DISP_PADRAO));
 let PARAMS = JSON.parse(JSON.stringify(DEFAULTS));
 let RASCUNHO_DESCARTADO = false;   // ajustes locais de uma versão antiga da tabela
 try{
   const sv = localStorage.getItem(KEY);
   if(sv){
     const o = JSON.parse(sv), p = (o && o.versao === P.versao) ? sanear(o.params) : null;
-    if(p) PARAMS = p; else { RASCUNHO_DESCARTADO = true; localStorage.removeItem(KEY); }
+    if(p){ PARAMS = p; const dd = saneDisp(o.disp); if(dd) DISP = dd; } else { RASCUNHO_DESCARTADO = true; localStorage.removeItem(KEY); }
   } else if(localStorage.getItem('validador-lead-params-v1')){ RASCUNHO_DESCARTADO = true; localStorage.removeItem('validador-lead-params-v1'); }
 }catch(e){}
-function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify({versao:P.versao, params:PARAMS})); }catch(e){} }
+function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify({versao:P.versao, params:PARAMS, disp:DISP})); }catch(e){} }
 const esc = t => String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 const $ = id => document.getElementById(id);
@@ -71,6 +75,7 @@ $('restaurar').addEventListener('click',()=>{
     AC = JSON.parse(JSON.stringify(AC_DEFAULT));
     try{ localStorage.removeItem(ACKEY); }catch(e){}
     document.querySelectorAll('.ack').forEach((k,i)=>{ if(AC[i]) k.value = AC[i].kwh; });
+    DISP = JSON.parse(JSON.stringify(DISP_PADRAO)); pintarDisp();
     RASCUNHO_DESCARTADO = false; refresh();
   }
 });
@@ -80,15 +85,21 @@ $('exportar').addEventListener('click',()=>{
   const dados = {
     versao: agora.toISOString().slice(0,16).replace(/[-:T]/g,''),
     atualizadoEm: agora.toLocaleDateString('pt-BR'),
-    descontoSocial: DESCONTO_SOCIAL, acs: AC, distribuidoras: PARAMS
+    descontoSocial: DESCONTO_SOCIAL, disponibilidade: DISP, acs: AC, distribuidoras: PARAMS
   };
   const conteudo = '/* Gerado pelo simulador em ' + agora.toLocaleString('pt-BR') + '. Substitua o parametros.js do repositório por este arquivo. */\nwindow.PARAMETROS = ' + JSON.stringify(dados,null,2) + ';\n';
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([conteudo],{type:'text/javascript'}));
   a.download = 'parametros.js'; document.body.appendChild(a); a.click(); a.remove();
 });
+const DISP_IDS = {dispMono:'Monofásico', dispBi:'Bifásico', dispTri:'Trifásico'};
+function pintarDisp(){ Object.entries(DISP_IDS).forEach(([id,t])=>{ $(id).value = DISP[t]; }); }
+Object.entries(DISP_IDS).forEach(([id,t])=>{
+  $(id).addEventListener('input',()=>{ const v = parseFloat($(id).value); if(Number.isFinite(v) && v >= 0){ DISP[t] = v; salvar(); calc(); } });
+});
+pintarDisp();
 function infoParametros(){
-  const mudou = JSON.stringify(PARAMS) !== JSON.stringify(DEFAULTS) || JSON.stringify(AC) !== JSON.stringify(AC_DEFAULT);
+  const mudou = JSON.stringify(PARAMS) !== JSON.stringify(DEFAULTS) || JSON.stringify(AC) !== JSON.stringify(AC_DEFAULT) || JSON.stringify(DISP) !== JSON.stringify(DISP_PADRAO);
   $('paramInfo').textContent = 'Tabela vigente: versão ' + P.versao + (P.atualizadoEm ? ' (atualizada em ' + P.atualizadoEm + ')' : '') + '.'
     + (!Object.keys(DEFAULTS).length ? ' ATENÇÃO: o arquivo parametros.js não foi carregado.' : '')
     + (mudou ? ' Há ajustes locais ainda não publicados: use "Exportar parametros.js".' : '')
@@ -134,11 +145,23 @@ function calc(){
   $('gPrev').textContent = prev==='–' ? '' : 'Com a média de consumo atual, o saldo dura ' + prev + '.';
   $('desc').textContent = social ? '− ' + fmt(DESCONTO_SOCIAL) : 'Não se aplica';
   $('minimo').textContent = minimo===null ? '–' : minimo;
+  // consumo anual estimado (média SEM subtrações) e energia compartilhada estimada no ano:
+  // cada mês informado (+ consumo extra esperado: AC, outros produtos, geração) menos a disponibilidade do tipo, mínimo 0
+  const adic = extra + outros + ger, disp = tipo ? DISP[tipo] : null;
+  const consAno = qtd ? (media + adic) * 12 : null;
+  let comp = null;
+  if(disp != null && qtd) comp = vals.map(v=>Math.max(0, v + adic - disp)).reduce((a,b)=>a+b,0) / qtd * 12;
+  $('consAno').textContent = consAno === null ? '–' : fmt(consAno);
+  $('dispVal').textContent = disp != null ? fmt(disp) : '–';
+  $('compAno').textContent = comp === null ? '–' : fmt(comp);
+  $('compNota').hidden = comp === null;
+  $('compNota').textContent = comp === null ? '' : (qtd < 12 ? 'Projeção para 12 meses a partir de ' + qtd + (qtd === 1 ? ' mês informado. ' : ' meses informados. ') : '')
+    + 'Cada mês: consumo' + (adic > 0 ? ' + consumo extra' : '') + ' − ' + fmt(disp) + ' kWh de disponibilidade (mínimo 0). A média estimada não tem essa subtração.';
   // mostra no resultado apenas as linhas com informação aplicada
   // (média informada só aparece quando há ajustes; sem ajustes seria igual à média considerada)
   $('media').parentElement.hidden = !(extra>0 || outros>0 || ger>0 || social) && media!==null && minimo!==null;
   $('relogio').parentElement.hidden = !tipo;
-  [['acExtra',extra>0],['outrosExtra',outros>0],['gerExtra',ger>0],['desc',!!social],['carteira',saldo!==null],['carteiraPrev',prev!=='–']]
+  [['acExtra',extra>0],['outrosExtra',outros>0],['gerExtra',ger>0],['desc',!!social],['carteira',saldo!==null],['carteiraPrev',prev!=='–'],['consAno',consAno!==null],['dispVal',comp!==null],['compAno',comp!==null]]
     .forEach(([id,on])=>{ $(id).parentElement.hidden = !on; });
 
   const st = $('status');

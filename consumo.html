@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Validador de lead - consumo médio x faixa de atendimento</title>
-<link rel="stylesheet" href="css/tema.css?v=1.2.0">
-<link rel="stylesheet" href="css/consumo.css?v=1.2.0">
-<script src="js/tema.js?v=1.2.0"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.3.0">
+<link rel="stylesheet" href="css/consumo.css?v=1.3.0">
+<script src="js/tema.js?v=1.3.0"></script>
 </head>
 <body>
 <header><h1>Validador de lead – consumo médio x faixa de atendimento</h1></header>
@@ -97,6 +97,10 @@
         <div class="row"><span>Média considerada (kWh)</span><b id="considerada">–</b></div>
         <div class="row"><span>Mínimo da faixa (kWh)</span><b id="minimo">–</b></div>
         <div class="row"><span>Diferença para o mínimo</span><b id="dif">–</b></div>
+        <div class="row"><span>Consumo anual estimado (kWh)</span><b id="consAno">–</b></div>
+        <div class="row"><span>Disponibilidade descontada (kWh/mês)</span><b id="dispVal">–</b></div>
+        <div class="row"><span>Energia compartilhada estimada no ano (kWh)</span><b id="compAno">–</b></div>
+        <p class="legend" id="compNota" hidden></p>
         <div class="row"><span>Saldo na carteira de energia (kWh)</span><b id="carteira">–</b></div>
         <div class="row"><span>Previsão de duração da carteira</span><b id="carteiraPrev">–</b></div>
         <div class="status warn" id="status">FALTA CONFIGURAR<small>Selecione a distribuidora, o tipo e informe ao menos um mês.</small></div>
@@ -114,6 +118,13 @@
           <p class="legend">Os valores vêm do arquivo <code>parametros.js</code> do repositório. Ajustes feitos aqui ficam só neste navegador até serem exportados e publicados.</p>
           <p class="legend" id="paramInfo"></p>
           <div class="scroll"><table><thead><tr><th>Distribuidora</th><th>Mono</th><th>Bi</th><th>Tri</th><th></th></tr></thead><tbody id="params"></tbody></table></div>
+          <h2 class="mt-14">Custo de disponibilidade (kWh/mês)</h2>
+          <p class="legend">Descontado de cada mês informado para estimar a energia compartilhada. A média estimada não usa esse desconto.</p>
+          <div class="dispgrid">
+            <label for="dispMono">Mono<input type="number" id="dispMono" min="0" step="1"></label>
+            <label for="dispBi">Bi<input type="number" id="dispBi" min="0" step="1"></label>
+            <label for="dispTri">Tri<input type="number" id="dispTri" min="0" step="1"></label>
+          </div>
           <h2 class="mt-14">Adicionar / atualizar distribuidora</h2>
           <div class="addrow">
             <input type="text" id="nNome" placeholder="Nome (ex.: CELESC - SC)">
@@ -131,8 +142,8 @@
 </main>
 
 <script src="js/vendor/pdf.min.js"></script>
-<script src="parametros.js?v=1.2.0"></script>
-<script src="js/consumo.js?v=1.2.0"></script>
-<script src="js/rastreio.js?v=1.2.0" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
+<script src="parametros.js?v=1.3.0"></script>
+<script src="js/consumo.js?v=1.3.0"></script>
+<script src="js/rastreio.js?v=1.3.0" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
 </body>
 </html>

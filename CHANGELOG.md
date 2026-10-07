@@ -10,6 +10,20 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.3.0] - 2026-10-07
+Estimativa anual de energia compartilhada no simulador de consumo. Validada por 590 testes automatizados e 22 testes em Chromium real.
+
+### Adicionado
+- **Energia compartilhada estimada no ano (kWh):** cada mês informado é reduzido pelo **custo de disponibilidade do tipo de atendimento** (monofásico **30 kWh**, bifásico **50 kWh**, trifásico **100 kWh**; mês abaixo disso vale 0) e o resultado é levado para 12 meses. Com menos de 12 meses informados, o resultado é uma projeção, e a tela avisa quantos meses foram usados.
+- **Consumo anual estimado (kWh):** média **sem subtrações** x 12, para comparar com a energia compartilhada.
+- **Disponibilidade descontada (kWh/mês):** mostra o valor aplicado ao tipo escolhido.
+- **Custo de disponibilidade editável**, como os demais parâmetros: vem do `parametros.js` (campo `disponibilidade`), aceita ajuste local, entra no "Exportar parametros.js" e volta ao padrão em "Restaurar".
+
+### Alterado
+- A **média estimada e a média considerada continuam sem a subtração**, como pedido; a tarifa social segue reduzindo apenas a média considerada.
+- A energia compartilhada e o consumo anual somam o consumo extra esperado (ar-condicionado, outros produtos e geração/injeção) a cada mês, e não usam o desconto da tarifa social. Meses desconsiderados no alerta de variação ficam de fora do cálculo.
+- Tabela de parâmetros na versão `2026-10-07`: ajustes locais antigos são descartados com aviso, como já acontece a cada nova versão da tabela.
+
 ## [1.2.0] - 2026-10-07
 Validada por 564 testes automatizados e 20 testes em Chromium real.
 

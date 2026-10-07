@@ -1,11 +1,13 @@
 /* Parâmetros de atendimento: FONTE ÚNICA, versionada no repositório.
    Para mudar um valor: edite aqui, atualize "versao" e "atualizadoEm" e publique (push).
    Quando a "versao" muda, os ajustes locais antigos feitos no navegador são descartados.
+   "disponibilidade" = custo de disponibilidade (kWh/mês por tipo), descontado de cada mês na energia compartilhada estimada.
    Dica: no simulador, o botão "Exportar parametros.js" gera este arquivo já com os seus ajustes. */
 window.PARAMETROS = {
-  "versao": "2026-10-05",
-  "atualizadoEm": "05/10/2026",
+  "versao": "2026-10-07",
+  "atualizadoEm": "07/10/2026",
   "descontoSocial": 200,
+  "disponibilidade": { "Monofásico": 30, "Bifásico": 50, "Trifásico": 100 },
   "acs": [
     {
       "btu": 9000,

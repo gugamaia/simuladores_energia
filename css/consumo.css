@@ -61,3 +61,5 @@ input[type=file]{width:100%}
 /* utilitarios */
 .mt-14{margin-top:14px}
 .mt-18{margin-top:18px}
+.dispgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dispgrid label{margin:6px 0 0}

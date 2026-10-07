@@ -25,6 +25,10 @@ const servidor = http.createServer((req, res) => {
   ok(A.width <= 372 && B.width <= 372 && C.width <= 372, 'consumo: colunas de até 370 px', [A.width, B.width, C.width].map(Math.round).join('/'));
   const nav = await caixa(p.locator('.nav-links')); ok(Math.abs(nav.x + nav.width / 2 - 800) < 25, 'barra: links centralizados', String(Math.round(nav.x + nav.width / 2)));
   const ver = await caixa(p.locator('#versaoNav')); ok(ver.x > 1450, 'barra: versão à direita', String(Math.round(ver.x)));
+  // 1b) energia compartilhada: linhas novas no resultado
+  await f.locator('#tipo').selectOption('Bifásico'); for (const [i, v] of [[1, 150], [2, 150], [3, 150]]) await f.locator('#m' + i).fill(String(v)); await p.waitForTimeout(300);
+  ok(await f.locator('#compAno').isVisible() && (await f.locator('#compAno').textContent()).trim() === '1.200,00' && (await f.locator('#dispVal').textContent()).trim() === '50,00', 'consumo: energia compartilhada anual (150 - 50) x 12 = 1.200 aparece no resultado');
+  ok((await f.locator('#consAno').textContent()).trim() === '1.800,00' && (await f.locator('#media').textContent()).trim() !== '', 'consumo: consumo anual estimado (1.800) sem subtração');
   // 2) tema
   const fundo = async () => f.locator('body').evaluate(e => getComputedStyle(e).backgroundColor);
   const escuro = await fundo(); const k0 = (await caixa(p.locator('.chave-bolinha'))).x; await p.click('.chave'); await p.waitForTimeout(400); const claro = await fundo(); const k1 = (await caixa(p.locator('.chave-bolinha'))).x;

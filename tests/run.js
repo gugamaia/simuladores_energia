@@ -85,7 +85,7 @@ async function estatico() {
   ok(!/cdnjs\.cloudflare/.test(fs.readFileSync(path.join(ROOT, 'consumo.html'), 'utf8') + fs.readFileSync(path.join(ROOT, 'js/consumo.js'), 'utf8')), 'leitor de PDF não depende de CDN');
   ok(!/cdnjs|googleapis|gstatic|unpkg|jsdelivr/.test(['proposta.html', 'css/proposta.css', 'js/proposta.js'].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('')), 'proposta não depende de CDN nem de fontes externas');
   ok(/runs-on|npm ci/.test(fs.readFileSync(path.join(ROOT, '.github/workflows/testes.yml'), 'utf8')), 'workflow de testes presente');
-  ok(typeof PARAM.versao === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(PARAM.atualizadoEm) && PARAM.descontoSocial === 200 && PARAM.acs.length === 5, 'parametros.js: versão, data, desconto social e 5 modelos de AC');
+  ok(typeof PARAM.versao === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(PARAM.atualizadoEm) && PARAM.descontoSocial === 200 && PARAM.acs.length === 5 && PARAM.disponibilidade['Monofásico'] === 30 && PARAM.disponibilidade['Bifásico'] === 50 && PARAM.disponibilidade['Trifásico'] === 100, 'parametros.js: versão, data, desconto social, 5 modelos de AC e disponibilidade 30/50/100');
   ok(JSON.stringify(Object.keys(PARAM.distribuidoras)) === JSON.stringify(Object.keys(TAB)) && Object.entries(PARAM.distribuidoras).every(([d, t]) => TIPOS.every((k, i) => t[k] === TAB[d][i])), 'parametros.js confere com a tabela do negócio (6 distribuidoras x 3 tipos)');
   const VER = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(VER);
   const cl = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8'), mv = cl.match(/^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})/m);
@@ -236,7 +236,7 @@ async function consumo2() {
   meses(w, [0, 0, 0, 0]); ok($(w, 'alertBox').hidden && !/NaN/.test(txt(w, 'media')), 'média 0 não gera alerta nem NaN');
   meses(w, [100, 100, 100, 100, 300]); setv(w, 'limiar', 200); ok($(w, 'alertBox').hidden, 'limite de 200% não alerta'); setv(w, 'limiar', 30);
   // parâmetros vindos do arquivo
-  ok(/versão 2026-10-05/.test(txt(w, 'paramInfo')) && !/ajustes locais/.test(txt(w, 'paramInfo')), 'mostra a versão vigente da tabela, sem ajustes locais');
+  ok(/versão 2026-10-07/.test(txt(w, 'paramInfo')) && !/ajustes locais/.test(txt(w, 'paramInfo')), 'mostra a versão vigente da tabela, sem ajustes locais');
   ok(w.document.querySelectorAll('#params tr').length === 6 && $(w, 'dist').options.length === 7, 'tabela carregada de parametros.js (6 distribuidoras)');
   ok(/Desconta 200 kWh/.test($(w, 'social').closest('label').querySelector('small').textContent), 'texto do desconto social vem do arquivo');
   // edição local
@@ -468,6 +468,75 @@ async function layoutConsumo() {
   w.close();
 }
 
+/* ======================= L) ENERGIA COMPARTILHADA ESTIMADA NO ANO ======================= */
+async function energiaCompartilhada() {
+  section('L) Energia compartilhada estimada no ano (desconto de disponibilidade: mono 30, bi 50, tri 100 kWh/mês)');
+  const w = await open('consumo.html'), q = id => num(txt(w, id));
+  const qac = (i, n) => { const e = w.document.querySelectorAll('.acq')[i]; e.value = n; e.dispatchEvent(new w.Event('input', { bubbles: true })); };
+  ok($(w, 'dispMono').value === '30' && $(w, 'dispBi').value === '50' && $(w, 'dispTri').value === '100', 'campos de disponibilidade vêm do arquivo de parâmetros (30 / 50 / 100)');
+  // monofásico
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [100, 100, 100]);
+  ok(q('dispVal') === 30 && q('compAno') === 840, 'mono: (100 - 30) x 12 = 840 kWh de energia compartilhada no ano', txt(w, 'compAno'));
+  ok(q('consAno') === 1200, 'consumo anual estimado = média x 12, sem subtração (1.200)', txt(w, 'consAno'));
+  ok(q('media') === 100 && q('considerada') === 100, 'a média estimada mantém os valores sem subtração (100)');
+  ok(/Projeção para 12 meses a partir de 3 meses informados/.test(txt(w, 'compNota')) && /30,00 kWh de disponibilidade/.test(txt(w, 'compNota')) && /não tem essa subtração/.test(txt(w, 'compNota')), 'nota explica a projeção e que a média não é subtraída', txt(w, 'compNota'));
+  meses(w, [100]); ok(/a partir de 1 mês informado/.test(txt(w, 'compNota')), 'nota no singular com 1 mês');
+  // bifásico: mês abaixo da disponibilidade vale 0
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [100, 40]);
+  ok(q('dispVal') === 50 && q('compAno') === 300, 'bi: meses abaixo da disponibilidade valem 0: (50 + 0) / 2 x 12 = 300', txt(w, 'compAno'));
+  ok(q('media') === 70 && q('consAno') === 840, 'bi: média (70) e consumo anual (840) sem subtração');
+  // trifásico com 12 meses: soma real, sem projeção
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, Array(12).fill(150));
+  ok(q('compAno') === 600 && q('dispVal') === 100 && !/Projeção/.test(txt(w, 'compNota')), 'tri com 12 meses: (150 - 100) x 12 = 600, sem projeção', txt(w, 'compAno'));
+  meses(w, [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200]); ok(q('compAno') === 6600 && q('consAno') === 7800, 'tri com 12 meses variados: soma dos (mês - 100) = 6.600', txt(w, 'compAno'));
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [20, 10]); ok(q('compAno') === 0 && vis(w, 'compAno'), 'todos os meses abaixo da disponibilidade: 0 kWh (e a linha continua visível)');
+  // extras e tarifa social
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [200]); qac(1, 1);
+  ok(q('compAno') === 3000 && q('consAno') === 4200 && q('considerada') === 350, 'com AC 12.000 BTUs (+150): (200 + 150 - 100) x 12 = 3.000; consumo anual 4.200', txt(w, 'compAno'));
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [300, 300, 300]); chk(w, 'social', true);
+  ok(q('considerada') === 100 && q('compAno') === 2400 && q('consAno') === 3600, 'tarifa social reduz só a média considerada; energia compartilhada e consumo anual não mudam');
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [100, 100, 100, 100, 300]);
+  const cx = w.document.querySelector('#alertList input'); cx.checked = true; cx.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ok(q('compAno') === 840 && q('consAno') === 1200, 'mês desconsiderado no alerta sai também do cálculo anual', txt(w, 'compAno'));
+  // visibilidade
+  base(w, 'ENERGISA - MT', ''); meses(w, [100, 100]); ok(!vis(w, 'compAno') && !vis(w, 'dispVal') && $(w, 'compNota').hidden && vis(w, 'consAno'), 'sem tipo: oculta disponibilidade e energia compartilhada; consumo anual continua');
+  $(w, 'limpar').click(); setv(w, 'tipo', 'Bifásico'); ok(!vis(w, 'compAno') && !vis(w, 'consAno') && $(w, 'compNota').hidden, 'sem meses informados: nada é estimado');
+  // edição, persistência e exportação
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [100, 100, 100]); setv(w, 'dispMono', 40);
+  ok(q('dispVal') === 40 && q('compAno') === 720, 'editar a disponibilidade recalcula na hora (100 - 40) x 12 = 720');
+  ok(JSON.parse(w.localStorage.getItem(KP)).disp['Monofásico'] === 40 && /ajustes locais/.test(txt(w, 'paramInfo')), 'ajuste da disponibilidade fica salvo como rascunho local e é sinalizado');
+  setv(w, 'dispMono', ''); setv(w, 'dispMono', -5); ok(q('compAno') === 720, 'valor vazio ou negativo na disponibilidade é ignorado');
+  w.URL.createObjectURL = b => { w.__blob = b; return 'blob:t'; }; w.HTMLAnchorElement.prototype.click = function () {};
+  $(w, 'exportar').click(); const txtExp = await new Promise(r => { const fr = new w.FileReader(); fr.onload = () => r(fr.result); fr.readAsText(w.__blob); }); const oe = {}; new Function('window', txtExp)(oe);
+  ok(oe.PARAMETROS.disponibilidade['Monofásico'] === 40 && oe.PARAMETROS.disponibilidade['Bifásico'] === 50 && oe.PARAMETROS.disponibilidade['Trifásico'] === 100, 'exportar parametros.js inclui a disponibilidade');
+  $(w, 'restaurar').click(); ok($(w, 'dispMono').value === '30' && q('compAno') === 840, 'restaurar volta a disponibilidade da tabela vigente (30)');
+  w.close();
+  // rascunho salvo, rascunho inválido e arquivo de parâmetros novo
+  let x = await open('consumo.html', { beforeParse(y) { y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, disp: { 'Monofásico': 45, 'Bifásico': 55, 'Trifásico': 105 } })); } });
+  ok($(x, 'dispMono').value === '45' && $(x, 'dispBi').value === '55' && $(x, 'dispTri').value === '105', 'rascunho local da mesma versão restaura a disponibilidade'); x.close();
+  x = await open('consumo.html', { beforeParse(y) { y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, disp: { 'Monofásico': -1 } })); } });
+  ok(!x.__errors.length && $(x, 'dispMono').value === '30' && $(x, 'dispTri').value === '100', 'disponibilidade inválida no armazenamento volta aos padrões', x.__errors.join('|')); x.close();
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, versao: '2099-01-01', disponibilidade: { 'Monofásico': 31, 'Bifásico': 51, 'Trifásico': 101 } }) + ';' } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [200]);
+  ok($(x, 'dispBi').value === '51' && num(txt(x, 'dispVal')) === 51 && num(txt(x, 'compAno')) === (200 - 51) * 12, 'nova tabela publicada no repositório muda a disponibilidade usada'); x.close();
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, disponibilidade: undefined }) + ';' } });
+  ok(!x.__errors.length && $(x, 'dispMono').value === '30' && $(x, 'dispTri').value === '100', 'tabela sem disponibilidade: usa 30 / 50 / 100 e não quebra', x.__errors.join('|')); x.close();
+  // propriedade: 120 casos aleatórios contra um modelo de referência
+  const w2 = await open('consumo.html'), q2 = id => num(txt(w2, id)), qa = (i, n) => { const e = w2.document.querySelectorAll('.acq')[i]; e.value = n; e.dispatchEvent(new w2.Event('input', { bubbles: true })); };
+  const DD = { 'Monofásico': 30, 'Bifásico': 50, 'Trifásico': 100 }; let erros = 0, amostra = '';
+  for (let i = 0; i < 120; i++) {
+    const t = TIPOS[ri(0, 2)]; base(w2, 'ENERGISA - MT', t); const arr = Array.from({ length: ri(1, 12) }, () => ri(0, 900)); meses(w2, arr);
+    const acq = [0, 0, 0, 0, 0].map(() => (rnd() < 0.4 ? ri(1, 3) : 0)); acq.forEach((n, j) => qa(j, n || '')); const ac = acq.reduce((s, n, j) => s + n * [100, 150, 250, 300, 400][j], 0);
+    let outros = 0; if (rnd() < 0.4) { const kw = ri(10, 200), n = ri(1, 3); setv(w2, 'oNome', 'P'); setv(w2, 'oKwh', kw); setv(w2, 'oQtd', n); $(w2, 'oAdd').click(); outros = kw * n; }
+    let ger = 0; if (rnd() < 0.4) { ger = ri(10, 300); chk(w2, 'gPossui', true); setv(w2, 'gKwh', ger); }
+    chk(w2, 'social', rnd() < 0.4);
+    const adic = ac + outros + ger, m = arr.reduce((a, b) => a + b, 0) / arr.length, cons = (m + adic) * 12, comp = arr.map(v => Math.max(0, v + adic - DD[t])).reduce((a, b) => a + b, 0) / arr.length * 12;
+    const gc = q2('compAno'), gk = q2('consAno');
+    if (!(Math.abs(gc - comp) < 0.011 && Math.abs(gk - cons) < 0.011 && q2('dispVal') === DD[t])) { erros++; if (!amostra) amostra = `${t} meses=${arr} adic=${adic} esperado comp ${comp.toFixed(2)} cons ${cons.toFixed(2)} obtido ${gc} / ${gk}`; }
+  }
+  ok(erros === 0, 'propriedade (120 casos aleatórios): energia compartilhada anual e consumo anual', erros + ' divergências. ' + amostra); w2.close();
+}
+
 /* ======================= F) MENU/HUB, ESTATÍSTICAS E RASTREIO ======================= */
 async function hub() {
   section('F) Menu, navegação, estatísticas e contagem');
@@ -531,7 +600,7 @@ async function rastreio() {
 
 (async () => {
   const t0 = Date.now();
-  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
+  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
   console.log('\n' + '='.repeat(60) + `\nAprovados: ${pass}   Reprovados: ${fail}   Avisos: ${warns.length}   (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('\nFALHAS:'); fails.forEach(f => console.log(' x ' + f)); }
   if (warns.length) { console.log('\nAVISOS:'); [...new Set(warns)].forEach(f => console.log(' ! ' + f)); }
