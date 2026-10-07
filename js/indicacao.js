@@ -61,3 +61,13 @@ function calc(){
   out.innerHTML = html;
 }
 ['fInd','fInv','pInv','pInd'].forEach(id=>$(id).addEventListener('input',calc));
+
+/* Limpar campos: zera as duas faturas e volta os percentuais ao padrão (50% e 100%) */
+$('limpar').addEventListener('click', ()=>{
+  $('fInd').value = '';
+  $('fInv').value = '';
+  $('pInv').value = 50;
+  $('pInd').value = 100;
+  calc();               // volta para a mensagem "Preencha as duas faturas para simular."
+  $('fInd').focus();    // cursor no primeiro campo
+});
