@@ -479,11 +479,15 @@ async function energiaCompartilhada() {
   ok(q('dispVal') === 30 && q('compAno') === 840, 'mono: (100 - 30) x 12 = 840 kWh de energia compartilhada no ano', txt(w, 'compAno'));
   ok(q('consAno') === 1200, 'consumo anual estimado = média x 12, sem subtração (1.200)', txt(w, 'consAno'));
   ok(q('media') === 100 && q('considerada') === 100, 'a média estimada mantém os valores sem subtração (100)');
-  ok(/Projeção para 12 meses a partir de 3 meses informados/.test(txt(w, 'compNota')) && /30,00 kWh de disponibilidade/.test(txt(w, 'compNota')) && /não tem essa subtração/.test(txt(w, 'compNota')), 'nota explica a projeção e que a média não é subtraída', txt(w, 'compNota'));
+  ok(/Projeção para 12 meses a partir de 3 meses informados/.test(txt(w, 'compNota')) && /\(média 100,00 − disponibilidade 30,00\) × 12 = 840,00 kWh/.test(txt(w, 'compNota')) && /não tem essa subtração/.test(txt(w, 'compNota')), 'nota mostra a fórmula (média − disponibilidade) × 12 e a projeção', txt(w, 'compNota'));
   meses(w, [100]); ok(/a partir de 1 mês informado/.test(txt(w, 'compNota')), 'nota no singular com 1 mês');
   // bifásico: mês abaixo da disponibilidade vale 0
   base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [100, 40]);
   ok(q('dispVal') === 50 && q('compAno') === 300, 'bi: meses abaixo da disponibilidade valem 0: (50 + 0) / 2 x 12 = 300', txt(w, 'compAno'));
+  ok(/cada mês − 50,00 kWh de disponibilidade, mínimo 0, projetado para 12 meses = 300,00 kWh/.test(txt(w, 'compNota')), 'nota explica o piso em 0 quando algum mês fica abaixo da disponibilidade', txt(w, 'compNota'));
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [500, 500, 500, 500]);
+  ok(q('media') === 500 && q('consAno') === 6000 && q('dispVal') === 50 && q('compAno') === 5400 && /\(média 500,00 − disponibilidade 50,00\) × 12 = 5\.400,00 kWh/.test(txt(w, 'compNota')), 'exemplo da tela: média 500 x 12 = 6.000 sem subtração; (500 - 50) x 12 = 5.400 com subtração');
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [100, 40]);
   ok(q('media') === 70 && q('consAno') === 840, 'bi: média (70) e consumo anual (840) sem subtração');
   // trifásico com 12 meses: soma real, sem projeção
   base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, Array(12).fill(150));

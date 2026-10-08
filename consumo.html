@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Validador de lead - consumo médio x faixa de atendimento</title>
-<link rel="stylesheet" href="css/tema.css?v=1.3.0">
-<link rel="stylesheet" href="css/consumo.css?v=1.3.0">
-<script src="js/tema.js?v=1.3.0"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.3.1">
+<link rel="stylesheet" href="css/consumo.css?v=1.3.1">
+<script src="js/tema.js?v=1.3.1"></script>
 </head>
 <body>
 <header><h1>Validador de lead – consumo médio x faixa de atendimento</h1></header>
@@ -97,8 +97,8 @@
         <div class="row"><span>Média considerada (kWh)</span><b id="considerada">–</b></div>
         <div class="row"><span>Mínimo da faixa (kWh)</span><b id="minimo">–</b></div>
         <div class="row"><span>Diferença para o mínimo</span><b id="dif">–</b></div>
-        <div class="row"><span>Consumo anual estimado (kWh)</span><b id="consAno">–</b></div>
-        <div class="row"><span>Disponibilidade descontada (kWh/mês)</span><b id="dispVal">–</b></div>
+        <div class="row"><span>Média estimada × 12, sem subtração (kWh)</span><b id="consAno">–</b></div>
+        <div class="row"><span>Disponibilidade do tipo de relógio (kWh/mês)</span><b id="dispVal">–</b></div>
         <div class="row"><span>Energia compartilhada estimada no ano (kWh)</span><b id="compAno">–</b></div>
         <p class="legend" id="compNota" hidden></p>
         <div class="row"><span>Saldo na carteira de energia (kWh)</span><b id="carteira">–</b></div>
@@ -142,8 +142,8 @@
 </main>
 
 <script src="js/vendor/pdf.min.js"></script>
-<script src="parametros.js?v=1.3.0"></script>
-<script src="js/consumo.js?v=1.3.0"></script>
-<script src="js/rastreio.js?v=1.3.0" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
+<script src="parametros.js?v=1.3.1"></script>
+<script src="js/consumo.js?v=1.3.1"></script>
+<script src="js/rastreio.js?v=1.3.1" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
 </body>
 </html>

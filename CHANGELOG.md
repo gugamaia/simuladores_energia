@@ -10,8 +10,13 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.3.1] - 2026-10-07
+### Alterado
+- **Resultado do consumo mais explícito:** "Média estimada × 12, sem subtração (kWh)" e "Energia compartilhada estimada no ano (kWh)" agora vêm acompanhados da fórmula na tela, por exemplo `(média 500,00 − disponibilidade 50,00) × 12 = 5.400,00 kWh`. A disponibilidade é a do tipo de relógio escolhido (mono 30, bi 50, tri 100 kWh/mês).
+- Quando algum mês fica abaixo da disponibilidade (valendo 0), a nota explica o cálculo mês a mês.
+
 ## [1.3.0] - 2026-10-07
-Estimativa anual de energia compartilhada no simulador de consumo. Validada por 590 testes automatizados e 22 testes em Chromium real.
+Estimativa anual de energia compartilhada no simulador de consumo. Validada por 590 testes automatizados e 22 testes em Chromium real (na 1.3.1: 592 e 22).
 
 ### Adicionado
 - **Energia compartilhada estimada no ano (kWh):** cada mês informado é reduzido pelo **custo de disponibilidade do tipo de atendimento** (monofásico **30 kWh**, bifásico **50 kWh**, trifásico **100 kWh**; mês abaixo disso vale 0) e o resultado é levado para 12 meses. Com menos de 12 meses informados, o resultado é uma projeção, e a tela avisa quantos meses foram usados.

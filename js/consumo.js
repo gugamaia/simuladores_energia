@@ -155,8 +155,11 @@ function calc(){
   $('dispVal').textContent = disp != null ? fmt(disp) : '–';
   $('compAno').textContent = comp === null ? '–' : fmt(comp);
   $('compNota').hidden = comp === null;
+  const semPiso = comp !== null && vals.every(v => v + adic - disp >= 0);   // nenhum mês ficou abaixo da disponibilidade
   $('compNota').textContent = comp === null ? '' : (qtd < 12 ? 'Projeção para 12 meses a partir de ' + qtd + (qtd === 1 ? ' mês informado. ' : ' meses informados. ') : '')
-    + 'Cada mês: consumo' + (adic > 0 ? ' + consumo extra' : '') + ' − ' + fmt(disp) + ' kWh de disponibilidade (mínimo 0). A média estimada não tem essa subtração.';
+    + (semPiso ? 'Cálculo: (média ' + fmt(media + adic) + ' − disponibilidade ' + fmt(disp) + ') × 12 = ' + fmt(comp) + ' kWh.'
+               : 'Cálculo: cada mês' + (adic > 0 ? ' (com o consumo extra)' : '') + ' − ' + fmt(disp) + ' kWh de disponibilidade, mínimo 0, projetado para 12 meses = ' + fmt(comp) + ' kWh.')
+    + ' A média considerada, usada na comparação com o mínimo, não tem essa subtração.';
   // mostra no resultado apenas as linhas com informação aplicada
   // (média informada só aparece quando há ajustes; sem ajustes seria igual à média considerada)
   $('media').parentElement.hidden = !(extra>0 || outros>0 || ger>0 || social) && media!==null && minimo!==null;
