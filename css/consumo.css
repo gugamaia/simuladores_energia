@@ -63,3 +63,6 @@ input[type=file]{width:100%}
 .mt-18{margin-top:18px}
 .dispgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .dispgrid label{margin:6px 0 0}
+#tarifas input{width:74px;padding:4px 6px}
+#tarifas td:first-child{white-space:nowrap;font-size:.85rem}
+#bandeiraInfo{display:block;color:var(--mute);font-size:.8rem;margin-top:4px}

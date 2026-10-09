@@ -20,16 +20,39 @@ const KEY = 'validador-lead-params-v2', ACKEY = 'validador-lead-ac-v2';
 function saneDisp(d){ return d && typeof d === 'object' && TIPOS.every(k=>Number.isFinite(d[k]) && d[k] >= 0) ? {"Monofásico":d["Monofásico"],"Bifásico":d["Bifásico"],"Trifásico":d["Trifásico"]} : null; }
 const DISP_PADRAO = saneDisp(P.disponibilidade) || {"Monofásico":30,"Bifásico":50,"Trifásico":100};
 let DISP = JSON.parse(JSON.stringify(DISP_PADRAO));
+/* Tarifa AXS (R$/kWh) por distribuidora e bandeira: usada para estimar a mensalidade */
+const TAX = P.tarifasAXS || {};
+const BANDEIRAS = Array.isArray(TAX.bandeiras) && TAX.bandeiras.length ? TAX.bandeiras : [];
+const copia = o => JSON.parse(JSON.stringify(o));
+const linhaOk = l => !!l && typeof l === 'object' && BANDEIRAS.length > 0 && BANDEIRAS.every(b=>Number.isFinite(l[b]) && l[b] >= 0);
+function saneTarifas(t){
+  if(!t || typeof t !== 'object' || Array.isArray(t)) return null;
+  const out = {};
+  Object.keys(t).forEach(d=>{
+    const v = t[d];
+    if(linhaOk(v)) out[d] = copia(v);
+    else if(v && typeof v === 'object' && Object.keys(v).length && Object.values(v).every(linhaOk)) out[d] = copia(v);   // com faixas (Copel)
+  });
+  return Object.keys(out).length ? out : null;
+}
+const TARIFAS_PADRAO = saneTarifas(TAX.valores) || {};
+let TARIFAS = copia(TARIFAS_PADRAO);
+const temFaixas = d => !!(BANDEIRAS.length && TARIFAS[d] && typeof TARIFAS[d][BANDEIRAS[0]] !== 'number');
+function tarifaAXS(d, b, f){
+  const t = TARIFAS[d]; if(!t) return null;
+  const linha = temFaixas(d) ? t[f || Object.keys(t)[0]] : t, v = linha ? linha[b] : null;
+  return Number.isFinite(v) ? v : null;
+}
 let PARAMS = JSON.parse(JSON.stringify(DEFAULTS));
 let RASCUNHO_DESCARTADO = false;   // ajustes locais de uma versão antiga da tabela
 try{
   const sv = localStorage.getItem(KEY);
   if(sv){
     const o = JSON.parse(sv), p = (o && o.versao === P.versao) ? sanear(o.params) : null;
-    if(p){ PARAMS = p; const dd = saneDisp(o.disp); if(dd) DISP = dd; } else { RASCUNHO_DESCARTADO = true; localStorage.removeItem(KEY); }
+    if(p){ PARAMS = p; const dd = saneDisp(o.disp); if(dd) DISP = dd; const tt = saneTarifas(o.tarifas); if(tt) TARIFAS = tt; } else { RASCUNHO_DESCARTADO = true; localStorage.removeItem(KEY); }
   } else if(localStorage.getItem('validador-lead-params-v1')){ RASCUNHO_DESCARTADO = true; localStorage.removeItem('validador-lead-params-v1'); }
 }catch(e){}
-function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify({versao:P.versao, params:PARAMS, disp:DISP})); }catch(e){} }
+function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify({versao:P.versao, params:PARAMS, disp:DISP, tarifas:TARIFAS})); }catch(e){} }
 const esc = t => String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 const $ = id => document.getElementById(id);
@@ -76,6 +99,7 @@ $('restaurar').addEventListener('click',()=>{
     try{ localStorage.removeItem(ACKEY); }catch(e){}
     document.querySelectorAll('.ack').forEach((k,i)=>{ if(AC[i]) k.value = AC[i].kwh; });
     DISP = JSON.parse(JSON.stringify(DISP_PADRAO)); pintarDisp();
+    TARIFAS = copia(TARIFAS_PADRAO); renderTarifas();
     RASCUNHO_DESCARTADO = false; refresh();
   }
 });
@@ -85,7 +109,7 @@ $('exportar').addEventListener('click',()=>{
   const dados = {
     versao: agora.toISOString().slice(0,16).replace(/[-:T]/g,''),
     atualizadoEm: agora.toLocaleDateString('pt-BR'),
-    descontoSocial: DESCONTO_SOCIAL, disponibilidade: DISP, acs: AC, distribuidoras: PARAMS
+    descontoSocial: DESCONTO_SOCIAL, disponibilidade: DISP, tarifasAXS: Object.assign({}, TAX, {valores: TARIFAS}), acs: AC, distribuidoras: PARAMS
   };
   const conteudo = '/* Gerado pelo simulador em ' + agora.toLocaleString('pt-BR') + '. Substitua o parametros.js do repositório por este arquivo. */\nwindow.PARAMETROS = ' + JSON.stringify(dados,null,2) + ';\n';
   const a = document.createElement('a');
@@ -98,8 +122,31 @@ Object.entries(DISP_IDS).forEach(([id,t])=>{
   $(id).addEventListener('input',()=>{ const v = parseFloat($(id).value); if(Number.isFinite(v) && v >= 0){ DISP[t] = v; salvar(); calc(); } });
 });
 pintarDisp();
+/* tabela editável da tarifa AXS + seletor de bandeira */
+function renderTarifas(){
+  const linhas = [];
+  Object.keys(TARIFAS).forEach(d=>{
+    const fx = temFaixas(d) ? Object.keys(TARIFAS[d]) : [null];
+    fx.forEach(f=>{
+      const lin = f ? TARIFAS[d][f] : TARIFAS[d];
+      linhas.push('<tr data-d="'+esc(d)+'"'+(f ? ' data-f="'+esc(f)+'"' : '')+'><td>'+esc(d)+(f ? ' · '+esc(f) : '')+'</td>'
+        + BANDEIRAS.map(b=>'<td><input type="number" min="0" step="0.00001" data-b="'+esc(b)+'" value="'+lin[b]+'"></td>').join('')+'</tr>');
+    });
+  });
+  $('tarifas').innerHTML = linhas.join('');
+}
+$('tarifas').addEventListener('input',e=>{
+  const i = e.target, tr = i.closest('tr'); if(!tr || !i.dataset.b) return;
+  const v = parseFloat(i.value); if(!Number.isFinite(v) || v < 0) return;
+  const d = tr.dataset.d, f = tr.dataset.f, lin = f ? TARIFAS[d][f] : TARIFAS[d];
+  lin[i.dataset.b] = v; salvar(); calc();
+});
+$('bandeira').innerHTML = BANDEIRAS.map(b=>'<option>'+esc(b)+'</option>').join('');
+if(BANDEIRAS.includes(TAX.bandeiraPadrao)) $('bandeira').value = TAX.bandeiraPadrao;
+$('bandeiraInfo').textContent = BANDEIRAS.length ? 'Tarifas AXS vigentes desde ' + (TAX.vigenteDesde || '–') + '. Bandeira de ' + (TAX.bandeiraReferencia || 'referência') + ': ' + (TAX.bandeiraPadrao || '–') + '.' : '';
+renderTarifas();
 function infoParametros(){
-  const mudou = JSON.stringify(PARAMS) !== JSON.stringify(DEFAULTS) || JSON.stringify(AC) !== JSON.stringify(AC_DEFAULT) || JSON.stringify(DISP) !== JSON.stringify(DISP_PADRAO);
+  const mudou = JSON.stringify(PARAMS) !== JSON.stringify(DEFAULTS) || JSON.stringify(AC) !== JSON.stringify(AC_DEFAULT) || JSON.stringify(DISP) !== JSON.stringify(DISP_PADRAO) || JSON.stringify(TARIFAS) !== JSON.stringify(TARIFAS_PADRAO);
   $('paramInfo').textContent = 'Tabela vigente: versão ' + P.versao + (P.atualizadoEm ? ' (atualizada em ' + P.atualizadoEm + ')' : '') + '.'
     + (!Object.keys(DEFAULTS).length ? ' ATENÇÃO: o arquivo parametros.js não foi carregado.' : '')
     + (mudou ? ' Há ajustes locais ainda não publicados: use "Exportar parametros.js".' : '')
@@ -160,11 +207,22 @@ function calc(){
     + (semPiso ? 'Cálculo: (média ' + fmt(media + adic) + ' − disponibilidade ' + fmt(disp) + ') × 12 = ' + fmt(comp) + ' kWh.'
                : 'Cálculo: cada mês' + (adic > 0 ? ' (com o consumo extra)' : '') + ' − ' + fmt(disp) + ' kWh de disponibilidade, mínimo 0, projetado para 12 meses = ' + fmt(comp) + ' kWh.')
     + ' A média considerada, usada na comparação com o mínimo, não tem essa subtração.';
+  // mensalidade AXS estimada = (média − disponibilidade) × tarifa AXS da distribuidora/bandeira
+  $('faixaBox').hidden = !(dist && temFaixas(dist));
+  const pres = comp === null ? null : comp / 12;     // média estimada mensal: (média − disponibilidade); cada mês com piso 0
+  const band = $('bandeira').value, fx = temFaixas(dist) ? $('faixa').value : null;
+  const tar = (dist && pres !== null) ? tarifaAXS(dist, band, fx) : null;
+  const mens = tar === null ? null : Math.round(pres * tar * 100 + 1e-9) / 100;   // arredonda ao centavo (meio centavo sobe)
+  $('presMes').textContent = pres === null ? '–' : fmt(pres);
+  $('tarifaVal').textContent = tar === null ? '–' : tar.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5});
+  $('mensal').textContent = mens === null ? '–' : mens.toLocaleString('pt-BR',{style:'currency', currency:'BRL'});
+  $('mensNota').hidden = mens === null;
+  $('mensNota').textContent = mens === null ? '' : dist + (fx ? ' · ' + fx : '') + ', bandeira ' + band + ': ' + fmt(pres) + ' kWh × R$ ' + tar.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5}) + '/kWh = ' + mens.toLocaleString('pt-BR',{style:'currency', currency:'BRL'}) + '. Estimativa: a mensalidade real depende da bandeira do mês.';
   // mostra no resultado apenas as linhas com informação aplicada
   // (média informada só aparece quando há ajustes; sem ajustes seria igual à média considerada)
   $('media').parentElement.hidden = !(extra>0 || outros>0 || ger>0 || social) && media!==null && minimo!==null;
   $('relogio').parentElement.hidden = !tipo;
-  [['acExtra',extra>0],['outrosExtra',outros>0],['gerExtra',ger>0],['desc',!!social],['carteira',saldo!==null],['carteiraPrev',prev!=='–'],['consAno',consAno!==null],['dispVal',comp!==null],['compAno',comp!==null]]
+  [['acExtra',extra>0],['outrosExtra',outros>0],['gerExtra',ger>0],['desc',!!social],['carteira',saldo!==null],['carteiraPrev',prev!=='–'],['consAno',consAno!==null],['dispVal',comp!==null],['compAno',comp!==null],['presMes',pres!==null],['tarifaVal',tar!==null],['mensal',tar!==null]]
     .forEach(([id,on])=>{ $(id).parentElement.hidden = !on; });
 
   const st = $('status');

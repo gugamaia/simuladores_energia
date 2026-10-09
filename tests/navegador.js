@@ -29,6 +29,12 @@ const servidor = http.createServer((req, res) => {
   await f.locator('#tipo').selectOption('Bifásico'); for (const [i, v] of [[1, 150], [2, 150], [3, 150]]) await f.locator('#m' + i).fill(String(v)); await p.waitForTimeout(300);
   ok(await f.locator('#compAno').isVisible() && (await f.locator('#compAno').textContent()).trim() === '1.200,00' && (await f.locator('#dispVal').textContent()).trim() === '50,00', 'consumo: energia compartilhada anual (150 - 50) x 12 = 1.200 aparece no resultado');
   ok((await f.locator('#consAno').textContent()).trim() === '1.800,00' && (await f.locator('#media').textContent()).trim() !== '', 'consumo: consumo anual estimado (1.800) sem subtração');
+  // 1c) mensalidade AXS estimada (exemplo: 4 meses de 500 kWh, bifásico, Energisa MT, bandeira Verde)
+  await f.locator('#dist').selectOption('ENERGISA - MT'); for (const i of [1, 2, 3, 4]) await f.locator('#m' + i).fill('500'); await p.waitForTimeout(300);
+  ok((await f.locator('#presMes').textContent()).trim() === '450,00' && (await f.locator('#tarifaVal').textContent()).trim() === '0,53965' && /242,84/.test(await f.locator('#mensal').textContent()), 'consumo: mensalidade estimada (500 - 50) x 0,53965 = R$ 242,84', await f.locator('#mensal').textContent());
+  await f.locator('#bandeira').selectOption('Vermelha II'); await p.waitForTimeout(200); ok(/264,11/.test(await f.locator('#mensal').textContent()), 'consumo: trocar a bandeira para Vermelha II recalcula (R$ 264,11)');
+  await f.locator('#dist').selectOption('COPEL - PR'); await p.waitForTimeout(200); ok(await f.locator('#faixa').isVisible(), 'consumo: a Faixa I/II aparece para a Copel');
+  await f.locator('#dist').selectOption('ENERGISA - MT'); await f.locator('#bandeira').selectOption('Verde');
   // 2) tema
   const fundo = async () => f.locator('body').evaluate(e => getComputedStyle(e).backgroundColor);
   const escuro = await fundo(); const k0 = (await caixa(p.locator('.chave-bolinha'))).x; await p.click('.chave'); await p.waitForTimeout(400); const claro = await fundo(); const k1 = (await caixa(p.locator('.chave-bolinha'))).x;

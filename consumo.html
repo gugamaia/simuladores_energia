@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Validador de lead - consumo médio x faixa de atendimento</title>
-<link rel="stylesheet" href="css/tema.css?v=1.3.1">
-<link rel="stylesheet" href="css/consumo.css?v=1.3.1">
-<script src="js/tema.js?v=1.3.1"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.4.0">
+<link rel="stylesheet" href="css/consumo.css?v=1.4.0">
+<script src="js/tema.js?v=1.4.0"></script>
 </head>
 <body>
 <header><h1>Validador de lead – consumo médio x faixa de atendimento</h1></header>
@@ -77,6 +77,13 @@
         <option value="">Selecione...</option>
         <option>Monofásico</option><option>Bifásico</option><option>Trifásico</option>
       </select>
+      <label for="bandeira">Bandeira tarifária</label>
+      <select id="bandeira"></select>
+      <small id="bandeiraInfo"></small>
+      <div id="faixaBox" hidden>
+        <label for="faixa">Faixa da tarifa AXS (Copel)</label>
+        <select id="faixa"><option value="Faixa I">Faixa I – 20%</option><option value="Faixa II">Faixa II – 25%</option></select>
+      </div>
       <label class="chk"><input type="checkbox" id="social"><span>Cliente com benefício do governo (tarifa social)<small>Desconta 200 kWh da média antes de comparar com o mínimo.</small></span></label>
       <h2 class="mt-18">Consumo dos últimos meses (kWh)</h2>
       <div class="months" id="months"></div>
@@ -101,6 +108,10 @@
         <div class="row"><span>Disponibilidade do tipo de relógio (kWh/mês)</span><b id="dispVal">–</b></div>
         <div class="row"><span>Energia compartilhada estimada no ano (kWh)</span><b id="compAno">–</b></div>
         <p class="legend" id="compNota" hidden></p>
+        <div class="row"><span>Média estimada: média − disponibilidade (kWh/mês)</span><b id="presMes">–</b></div>
+        <div class="row"><span>Tarifa AXS (R$/kWh)</span><b id="tarifaVal">–</b></div>
+        <div class="row"><span>Mensalidade AXS estimada (R$/mês)</span><b id="mensal">–</b></div>
+        <p class="legend" id="mensNota" hidden></p>
         <div class="row"><span>Saldo na carteira de energia (kWh)</span><b id="carteira">–</b></div>
         <div class="row"><span>Previsão de duração da carteira</span><b id="carteiraPrev">–</b></div>
         <div class="status warn" id="status">FALTA CONFIGURAR<small>Selecione a distribuidora, o tipo e informe ao menos um mês.</small></div>
@@ -125,6 +136,9 @@
             <label for="dispBi">Bi<input type="number" id="dispBi" min="0" step="1"></label>
             <label for="dispTri">Tri<input type="number" id="dispTri" min="0" step="1"></label>
           </div>
+          <h2 class="mt-14">Tarifa AXS por bandeira (R$/kWh)</h2>
+          <p class="legend">Usada para estimar a mensalidade: (média − disponibilidade) × tarifa AXS da distribuidora e da bandeira.</p>
+          <div class="scroll"><table><thead><tr><th>Distribuidora</th><th>Verde</th><th>Amarela</th><th>Verm. I</th><th>Verm. II</th></tr></thead><tbody id="tarifas"></tbody></table></div>
           <h2 class="mt-14">Adicionar / atualizar distribuidora</h2>
           <div class="addrow">
             <input type="text" id="nNome" placeholder="Nome (ex.: CELESC - SC)">
@@ -142,8 +156,8 @@
 </main>
 
 <script src="js/vendor/pdf.min.js"></script>
-<script src="parametros.js?v=1.3.1"></script>
-<script src="js/consumo.js?v=1.3.1"></script>
-<script src="js/rastreio.js?v=1.3.1" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
+<script src="parametros.js?v=1.4.0"></script>
+<script src="js/consumo.js?v=1.4.0"></script>
+<script src="js/rastreio.js?v=1.4.0" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
 </body>
 </html>

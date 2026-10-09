@@ -236,7 +236,7 @@ async function consumo2() {
   meses(w, [0, 0, 0, 0]); ok($(w, 'alertBox').hidden && !/NaN/.test(txt(w, 'media')), 'média 0 não gera alerta nem NaN');
   meses(w, [100, 100, 100, 100, 300]); setv(w, 'limiar', 200); ok($(w, 'alertBox').hidden, 'limite de 200% não alerta'); setv(w, 'limiar', 30);
   // parâmetros vindos do arquivo
-  ok(/versão 2026-10-07/.test(txt(w, 'paramInfo')) && !/ajustes locais/.test(txt(w, 'paramInfo')), 'mostra a versão vigente da tabela, sem ajustes locais');
+  ok(/versão 2026-10-08/.test(txt(w, 'paramInfo')) && !/ajustes locais/.test(txt(w, 'paramInfo')), 'mostra a versão vigente da tabela, sem ajustes locais');
   ok(w.document.querySelectorAll('#params tr').length === 6 && $(w, 'dist').options.length === 7, 'tabela carregada de parametros.js (6 distribuidoras)');
   ok(/Desconta 200 kWh/.test($(w, 'social').closest('label').querySelector('small').textContent), 'texto do desconto social vem do arquivo');
   // edição local
@@ -541,6 +541,97 @@ async function energiaCompartilhada() {
   ok(erros === 0, 'propriedade (120 casos aleatórios): energia compartilhada anual e consumo anual', erros + ' divergências. ' + amostra); w2.close();
 }
 
+/* ======================= M) MENSALIDADE AXS ESTIMADA (tabela de 30/09/2026) ======================= */
+const PDF_TARIFAS = {   // [tarifa compensável, "Tarifa AXS"] por bandeira, copiado do comunicado de 30/09/2026
+  'CEMIG - MG': { desc: 0.30, l: { 'Verde': [1.13756, 0.79629], 'Amarela': [1.16227, 0.81359], 'Vermelha I': [1.19608, 0.83726], 'Vermelha II': [1.24085, 0.86859] } },
+  'COPEL - PR · Faixa I': { desc: 0.20, l: { 'Verde': [0.76802, 0.61442], 'Amarela': [0.78687, 0.62950], 'Vermelha I': [0.81265, 0.65012], 'Vermelha II': [0.84679, 0.67743] } },
+  'COPEL - PR · Faixa II': { desc: 0.25, l: { 'Verde': [0.76802, 0.57602], 'Amarela': [0.78687, 0.59015], 'Vermelha I': [0.81265, 0.60949], 'Vermelha II': [0.84679, 0.63509] } },
+  'CPFL Paulista - SP': { desc: 0.10, l: { 'Verde': [0.85045, 0.76541], 'Amarela': [0.87480, 0.78732], 'Vermelha I': [0.90809, 0.81728], 'Vermelha II': [0.95217, 0.85695] } },
+  'ELEKTRO - SP': { desc: 0.10, l: { 'Verde': [1.00309, 0.90278], 'Amarela': [1.02703, 0.92433], 'Vermelha I': [1.05977, 0.95379], 'Vermelha II': [1.10313, 0.99281] } },
+  'ENERGISA - MT': { desc: 0.40, l: { 'Verde': [0.89942, 0.53965], 'Amarela': [0.91827, 0.55096], 'Vermelha I': [0.94405, 0.56643], 'Vermelha II': [0.97819, 0.58691] } },
+  'EQUATORIAL - GO': { desc: 0.30, l: { 'Verde': [1.10307, 0.77215], 'Amarela': [1.12648, 0.78854], 'Vermelha I': [1.15850, 0.81095], 'Vermelha II': [1.20090, 0.84063] } },
+};
+const BAND = ['Verde', 'Amarela', 'Vermelha I', 'Vermelha II'];
+const tarPDF = (d, b, f) => PDF_TARIFAS[d + (f ? ' · ' + f : '')].l[b][1];
+async function mensalidade() {
+  section('M) Mensalidade AXS estimada: (média - disponibilidade) x Tarifa AXS da distribuidora e da bandeira');
+  const T = PARAM.tarifasAXS; let div = 0, dif = '';
+  ok(!!T && T.vigenteDesde === '01/10/2026' && T.bandeiraPadrao === 'Verde' && BAND.every((b, i) => T.bandeiras[i] === b), 'parametros.js: tarifas vigentes desde 01/10/2026, bandeira Verde e as 4 bandeiras');
+  for (const [chave, { desc, l }] of Object.entries(PDF_TARIFAS)) for (const b of BAND) {
+    const [d, f] = chave.split(' · '), v = f ? T.valores[d][f][b] : T.valores[d][b], [comp, axs] = l[b];
+    if (v !== axs) { div++; dif = dif || `${chave}/${b}: ${v} != ${axs}`; }
+    if (Math.abs(comp * (1 - desc) - axs) > 0.00001) { div++; dif = dif || `PDF inconsistente ${chave}/${b}`; }
+  }
+  ok(div === 0, 'parametros.js confere com o comunicado (7 tabelas x 4 bandeiras = 28 tarifas) e cada Tarifa AXS = compensável x (1 - desconto)', dif);
+  const w = await open('consumo.html'), q = id => num(txt(w, id)), vis2 = id => !$(w, id).hidden;
+  ok([...$(w, 'bandeira').options].map(o => o.value).join() === BAND.join() && $(w, 'bandeira').value === 'Verde' && /01\/10\/2026/.test(txt(w, 'bandeiraInfo')) && /Verde/.test(txt(w, 'bandeiraInfo')), 'seletor de bandeira: 4 opções, Verde como padrão e aviso da vigência');
+  ok(w.document.querySelectorAll('#tarifas tr').length === 7 && w.document.querySelectorAll('#tarifas input').length === 28, 'tabela editável da Tarifa AXS: 7 linhas (Copel com 2 faixas) e 28 campos');
+  // exemplo: 4 meses de 500 kWh, bifásico, Energisa MT
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [500, 500, 500, 500]);
+  ok(q('presMes') === 450 && txt(w, 'tarifaVal') === '0,53965' && /R\$\s?242,84/.test(txt(w, 'mensal')), 'Energisa MT, Verde: (500 - 50) = 450 kWh x 0,53965 = R$ 242,84', txt(w, 'presMes') + ' | ' + txt(w, 'tarifaVal') + ' | ' + txt(w, 'mensal'));
+  ok(/ENERGISA - MT, bandeira Verde: 450,00 kWh × R\$ 0,53965\/kWh = R\$\s?242,84/.test(txt(w, 'mensNota')) && /depende da bandeira/.test(txt(w, 'mensNota')), 'nota mostra a conta e o aviso de estimativa', txt(w, 'mensNota'));
+  for (const [b, esp] of [['Amarela', 247.93], ['Vermelha I', 254.89], ['Vermelha II', 264.11], ['Verde', 242.84]]) { setv(w, 'bandeira', b); ok(Math.abs(q('mensal') - esp) < 0.006 && txt(w, 'tarifaVal') === tarPDF('ENERGISA - MT', b).toFixed(5).replace('.', ','), 'bandeira ' + b + ': mensalidade R$ ' + esp.toFixed(2), txt(w, 'mensal')); }
+  ok(q('media') === 500 && q('considerada') === 500 && q('compAno') === 5400 && q('consAno') === 6000, 'a média considerada e as linhas anuais continuam como antes (500 / 6.000 / 5.400)');
+  // todas as distribuidoras x bandeiras (monofásico, 3 meses de 200 kWh: 170 kWh de média estimada)
+  let errosT = 0, amostraT = ''; for (const d of ['CEMIG - MG', 'CPFL Paulista - SP', 'ELEKTRO - SP', 'ENERGISA - MT', 'EQUATORIAL - GO']) for (const b of BAND) {
+    base(w, d, 'Monofásico'); meses(w, [200, 200, 200]); setv(w, 'bandeira', b); const esp = Math.round(170 * tarPDF(d, b) * 100) / 100;
+    if (!(Math.abs(q('mensal') - esp) < 0.006 && vis2('presMes') === true)) { errosT++; amostraT = amostraT || `${d}/${b}: esperado ${esp} obtido ${txt(w, 'mensal')}`; } }
+  ok(errosT === 0, '5 distribuidoras x 4 bandeiras: mensalidade = 170 kWh x Tarifa AXS do comunicado', amostraT);
+  // Copel e as duas faixas
+  base(w, 'COPEL - PR', 'Trifásico'); meses(w, [400, 400]); setv(w, 'bandeira', 'Verde');
+  ok(!$(w, 'faixaBox').hidden && q('presMes') === 300 && txt(w, 'tarifaVal') === '0,61442' && /R\$\s?184,33/.test(txt(w, 'mensal')), 'Copel, Faixa I (20%): 300 kWh x 0,61442 = R$ 184,33', txt(w, 'mensal'));
+  setv(w, 'faixa', 'Faixa II'); ok(txt(w, 'tarifaVal') === '0,57602' && /R\$\s?172,81/.test(txt(w, 'mensal')) && /Faixa II/.test(txt(w, 'mensNota')), 'Copel, Faixa II (25%): 300 kWh x 0,57602 = R$ 172,81');
+  setv(w, 'bandeira', 'Vermelha II'); ok(txt(w, 'tarifaVal') === '0,63509', 'Copel, Faixa II, Vermelha II: 0,63509'); setv(w, 'faixa', 'Faixa I'); setv(w, 'bandeira', 'Verde');
+  setv(w, 'dist', 'ENERGISA - MT'); ok($(w, 'faixaBox').hidden, 'a escolha de faixa só aparece para a Copel');
+  // piso, extras, tarifa social
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [20, 10]); ok(q('presMes') === 0 && /R\$\s?0,00/.test(txt(w, 'mensal')) && vis(w, 'mensal'), 'meses abaixo da disponibilidade: consumo presumido 0 e mensalidade R$ 0,00');
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [200]); const e = w.document.querySelectorAll('.acq')[1]; e.value = 1; e.dispatchEvent(new w.Event('input', { bubbles: true }));
+  ok(q('presMes') === 250 && /R\$\s?134,91/.test(txt(w, 'mensal')), 'com AC de 12.000 BTUs: (200 + 150 - 100) = 250 kWh x 0,53965 = R$ 134,91', txt(w, 'mensal'));
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [300, 300, 300]); const antes = txt(w, 'mensal'); chk(w, 'social', true); ok(txt(w, 'mensal') === antes && q('considerada') === 100, 'tarifa social não altera a mensalidade estimada');
+  // visibilidade
+  base(w, '', 'Bifásico'); meses(w, [500]); ok(vis(w, 'presMes') && !vis(w, 'tarifaVal') && !vis(w, 'mensal') && $(w, 'mensNota').hidden, 'sem distribuidora: mostra só a média estimada; sem tarifa nem mensalidade');
+  base(w, 'ENERGISA - MT', ''); meses(w, [500]); ok(!vis(w, 'presMes') && !vis(w, 'mensal'), 'sem tipo de relógio: nada de mensalidade');
+  $(w, 'limpar').click(); setv(w, 'tipo', 'Bifásico'); setv(w, 'dist', 'ENERGISA - MT'); ok(!vis(w, 'mensal') && !vis(w, 'presMes'), 'sem meses informados: nada é estimado');
+  setv(w, 'nNome', 'CELESC - SC'); setv(w, 'nMono', 100); setv(w, 'nBi', 120); setv(w, 'nTri', 160); $(w, 'add').click(); base(w, 'CELESC - SC', 'Bifásico'); meses(w, [300]);
+  ok(vis(w, 'presMes') && !vis(w, 'mensal') && !w.__errors.length, 'distribuidora cadastrada sem tarifa AXS: não estima mensalidade e não quebra', w.__errors.join('|'));
+  // edição, persistência e exportação
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [500, 500, 500, 500]);
+  const cel = w.document.querySelector('#tarifas tr[data-d="ENERGISA - MT"] input[data-b="Verde"]'); cel.value = 0.6; cel.dispatchEvent(new w.Event('input', { bubbles: true }));
+  ok(/R\$\s?270,00/.test(txt(w, 'mensal')) && txt(w, 'tarifaVal') === '0,60000', 'editar a Tarifa AXS na tabela recalcula (450 x 0,60 = R$ 270,00)', txt(w, 'mensal'));
+  ok(JSON.parse(w.localStorage.getItem(KP)).tarifas['ENERGISA - MT']['Verde'] === 0.6 && /ajustes locais/.test(txt(w, 'paramInfo')), 'ajuste da tarifa fica salvo como rascunho local e é sinalizado');
+  cel.value = ''; cel.dispatchEvent(new w.Event('input', { bubbles: true })); cel.value = -1; cel.dispatchEvent(new w.Event('input', { bubbles: true })); ok(txt(w, 'tarifaVal') === '0,60000', 'valor vazio ou negativo na tabela é ignorado');
+  const cf = w.document.querySelector('#tarifas tr[data-d="COPEL - PR"][data-f="Faixa II"] input[data-b="Amarela"]'); cf.value = 0.7; cf.dispatchEvent(new w.Event('input', { bubbles: true })); ok(w.eval('TARIFAS["COPEL - PR"]["Faixa II"]["Amarela"]') === 0.7 && w.eval('TARIFAS["COPEL - PR"]["Faixa I"]["Amarela"]') === 0.6295, 'editar a faixa II da Copel não mexe na faixa I');
+  w.URL.createObjectURL = bl => { w.__blob = bl; return 'blob:t'; }; w.HTMLAnchorElement.prototype.click = function () {};
+  $(w, 'exportar').click(); const ex = await new Promise(r => { const fr = new w.FileReader(); fr.onload = () => r(fr.result); fr.readAsText(w.__blob); }); const oe = {}; new Function('window', ex)(oe);
+  ok(oe.PARAMETROS.tarifasAXS.valores['ENERGISA - MT']['Verde'] === 0.6 && oe.PARAMETROS.tarifasAXS.bandeiraPadrao === 'Verde' && oe.PARAMETROS.tarifasAXS.vigenteDesde === '01/10/2026' && oe.PARAMETROS.tarifasAXS.bandeiras.length === 4, 'exportar parametros.js inclui a tabela de tarifas editada, a vigência e as bandeiras');
+  $(w, 'restaurar').click(); ok(w.eval('TARIFAS["ENERGISA - MT"]["Verde"]') === 0.53965 && w.document.querySelector('#tarifas tr[data-d="ENERGISA - MT"] input[data-b="Verde"]').value === '0.53965' && /R\$\s?242,84/.test(txt(w, 'mensal')), 'restaurar volta à tabela vigente (0,53965)');
+  w.close();
+  // rascunho, rascunho inválido, tabela nova e ausente
+  let x = await open('consumo.html', { beforeParse(y) { const t = JSON.parse(JSON.stringify(PARAM.tarifasAXS.valores)); t['ENERGISA - MT']['Verde'] = 0.55; y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, tarifas: t })); } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok(num(txt(x, 'tarifaVal')) === 0.55, 'rascunho local da mesma versão restaura a tabela de tarifas'); x.close();
+  x = await open('consumo.html', { beforeParse(y) { y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, tarifas: { 'ENERGISA - MT': { 'Verde': -1 } } })); } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok(!x.__errors.length && num(txt(x, 'tarifaVal')) === 0.53965, 'tarifas inválidas no armazenamento voltam à tabela vigente', x.__errors.join('|')); x.close();
+  const novaT = JSON.parse(JSON.stringify(PARAM.tarifasAXS)); novaT.valores['ENERGISA - MT']['Verde'] = 0.5; novaT.bandeiraPadrao = 'Amarela';
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, versao: '2099-01-01', tarifasAXS: novaT }) + ';' } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok($(x, 'bandeira').value === 'Amarela' && num(txt(x, 'tarifaVal')) === 0.55096 && /R\$\s?247,93/.test(txt(x, 'mensal')), 'nova tabela publicada: bandeira padrão e tarifas vêm do arquivo (Amarela: 0,55096)'); setv(x, 'bandeira', 'Verde'); ok(num(txt(x, 'tarifaVal')) === 0.5, 'a tarifa nova do arquivo é usada (Verde: 0,50)'); x.close();
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, tarifasAXS: undefined }) + ';' } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok(!x.__errors.length && x.document.getElementById('mensal').parentElement.hidden && x.document.getElementById('bandeira').options.length === 0 && num(txt(x, 'compAno')) === 5400, 'tabela sem tarifas AXS: não estima mensalidade, mantém o restante e não quebra', x.__errors.join('|')); x.close();
+  // propriedade: 100 casos aleatórios contra um modelo de referência
+  const w2 = await open('consumo.html'), q2 = id => num(txt(w2, id)), qa = (i, n) => { const el = w2.document.querySelectorAll('.acq')[i]; el.value = n; el.dispatchEvent(new w2.Event('input', { bubbles: true })); };
+  const DD = { 'Monofásico': 30, 'Bifásico': 50, 'Trifásico': 100 }, DS = ['CEMIG - MG', 'COPEL - PR', 'CPFL Paulista - SP', 'ELEKTRO - SP', 'ENERGISA - MT', 'EQUATORIAL - GO']; let erros = 0, amostra = '';
+  for (let i = 0; i < 100; i++) {
+    const d = DS[ri(0, 5)], t = TIPOS[ri(0, 2)], b = BAND[ri(0, 3)], f = d === 'COPEL - PR' ? (rnd() < 0.5 ? 'Faixa I' : 'Faixa II') : null;
+    base(w2, d, t); const arr = Array.from({ length: ri(1, 12) }, () => ri(0, 900)); meses(w2, arr); setv(w2, 'bandeira', b); if (f) setv(w2, 'faixa', f);
+    const acq = [0, 0, 0, 0, 0].map(() => (rnd() < 0.4 ? ri(1, 3) : 0)); acq.forEach((n, j) => qa(j, n || '')); const ac = acq.reduce((s, n, j) => s + n * [100, 150, 250, 300, 400][j], 0);
+    let outros = 0; if (rnd() < 0.4) { const kw = ri(10, 200), n = ri(1, 3); setv(w2, 'oNome', 'P'); setv(w2, 'oKwh', kw); setv(w2, 'oQtd', n); $(w2, 'oAdd').click(); outros = kw * n; }
+    let ger = 0; if (rnd() < 0.4) { ger = ri(10, 300); chk(w2, 'gPossui', true); setv(w2, 'gKwh', ger); }
+    chk(w2, 'social', rnd() < 0.4);
+    const adic = ac + outros + ger, pres = arr.map(v => Math.max(0, v + adic - DD[t])).reduce((a, c) => a + c, 0) / arr.length, esp = Math.round(pres * tarPDF(d, b, f) * 100) / 100;
+    if (!(Math.abs(q2('mensal') - esp) < 0.006 && Math.abs(q2('presMes') - pres) < 0.006)) { erros++; amostra = amostra || `${d} ${f || ''} ${b} ${t} meses=${arr} adic=${adic} esperado ${esp} obtido ${txt(w2, 'mensal')}`; }
+  }
+  ok(erros === 0, 'propriedade (100 casos aleatórios): média estimada mensal e mensalidade', erros + ' divergências. ' + amostra); w2.close();
+}
+
 /* ======================= F) MENU/HUB, ESTATÍSTICAS E RASTREIO ======================= */
 async function hub() {
   section('F) Menu, navegação, estatísticas e contagem');
@@ -604,7 +695,7 @@ async function rastreio() {
 
 (async () => {
   const t0 = Date.now();
-  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
+  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, mensalidade, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
   console.log('\n' + '='.repeat(60) + `\nAprovados: ${pass}   Reprovados: ${fail}   Avisos: ${warns.length}   (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('\nFALHAS:'); fails.forEach(f => console.log(' x ' + f)); }
   if (warns.length) { console.log('\nAVISOS:'); [...new Set(warns)].forEach(f => console.log(' ! ' + f)); }

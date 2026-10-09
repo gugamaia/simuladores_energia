@@ -10,6 +10,23 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.4.0] - 2026-10-08
+Estimativa da mensalidade AXS com a tabela de tarifas do comunicado de 30/09/2026. Validada por 627 testes automatizados e 25 testes em Chromium real.
+
+### Adicionado
+- **Mensalidade AXS estimada (R$/mês):** `(média − disponibilidade do relógio) × Tarifa AXS` da distribuidora e da bandeira escolhidas. Exemplo: Energisa MT, bifásico, média 500 kWh, bandeira Verde = (500 − 50) × 0,53965 = **R$ 242,84**.
+- **Média estimada: média − disponibilidade (kWh/mês):** nova linha com o consumo presumido mensal usado na conta (cada mês com piso 0, o mesmo critério da energia compartilhada anual).
+- **Seletor de bandeira tarifária** (Verde, Amarela, Vermelha I e Vermelha II; Verde por padrão, vigente em outubro/2026) e, para a **Copel**, a escolha da **Faixa I (20%) ou Faixa II (25%)**.
+- **Tabela da Tarifa AXS** no `parametros.js` (6 distribuidoras x 4 bandeiras, Copel com 2 faixas), editável na tela, com rascunho local, exportação e restauração, como os demais parâmetros.
+- A nota do resultado mostra a conta completa e avisa que é estimativa, pois a mensalidade real depende da bandeira do mês.
+
+### Alterado
+- Tabela de parâmetros na versão `2026-10-08` (ajustes locais antigos são descartados com aviso).
+- A média considerada (comparação com o mínimo) e as linhas anuais continuam como antes. Tarifa social não altera a mensalidade. Distribuidora cadastrada sem tarifa AXS não gera mensalidade.
+
+### Validação dos dados
+- As 28 tarifas do comunicado foram conferidas contra o PDF e entre si (Tarifa AXS = tarifa compensável × (1 − desconto)). Única diferença: Elektro, Vermelha II, 0,992817 calculado x 0,99281 no comunicado (arredondamento, abaixo de R$ 0,00001/kWh).
+
 ## [1.3.1] - 2026-10-07
 ### Alterado
 - **Resultado do consumo mais explícito:** "Média estimada × 12, sem subtração (kWh)" e "Energia compartilhada estimada no ano (kWh)" agora vêm acompanhados da fórmula na tela, por exemplo `(média 500,00 − disponibilidade 50,00) × 12 = 5.400,00 kWh`. A disponibilidade é a do tipo de relógio escolhido (mono 30, bi 50, tri 100 kWh/mês).
