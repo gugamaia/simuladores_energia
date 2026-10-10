@@ -2,21 +2,25 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f161c" media="(prefers-color-scheme: dark)">
 <title>Simuladores</title>
-<link rel="stylesheet" href="css/tema.css?v=1.4.0">
-<link rel="stylesheet" href="css/index.css?v=1.4.0">
-<script src="js/tema.js?v=1.4.0"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.5.0">
+<link rel="stylesheet" href="css/index.css?v=1.5.0">
+<link rel="stylesheet" href="css/mobile.css?v=1.5.0">
+<script src="js/tema.js?v=1.5.0"></script>
 </head>
 <body>
 <header id="topo">
   <nav id="nav" aria-label="Navega&ccedil;&atilde;o principal">
     <span class="nav-esq" aria-hidden="true"></span>
     <div class="nav-links">
-      <a href="#inicio" data-k="inicio">P&aacute;gina principal</a>
-      <a href="#indicacao" data-k="indicacao">Simula&ccedil;&atilde;o de indica&ccedil;&atilde;o</a>
-      <a href="#consumo" data-k="consumo">Simula&ccedil;&atilde;o de consumo de energia</a>
-      <a href="#proposta" data-k="proposta">Proposta de oferta</a>
+      <a href="#inicio" data-k="inicio" data-ic="&#127968;" data-curto="Início" aria-label="Página principal">P&aacute;gina principal</a>
+      <a href="#indicacao" data-k="indicacao" data-ic="&#127873;" data-curto="Indicação" aria-label="Simulação de indicação">Simula&ccedil;&atilde;o de indica&ccedil;&atilde;o</a>
+      <a href="#consumo" data-k="consumo" data-ic="&#9889;" data-curto="Consumo" aria-label="Simulação de consumo de energia">Simula&ccedil;&atilde;o de consumo de energia</a>
+      <a href="#proposta" data-k="proposta" data-ic="&#128196;" data-curto="Proposta" aria-label="Proposta de oferta">Proposta de oferta</a>
     </div>
     <div class="nav-dir">
       <label class="chave" title="Alternar entre tema claro e escuro">
@@ -62,8 +66,8 @@
 <div id="tool">
   <iframe id="frame" title="Simulador"></iframe>
 </div>
-<script src="config.js?v=1.4.0"></script>
-<script src="versao.js?v=1.4.0"></script>
-<script src="js/index.js?v=1.4.0"></script>
+<script src="config.js?v=1.5.0"></script>
+<script src="versao.js?v=1.5.0"></script>
+<script src="js/index.js?v=1.5.0"></script>
 </body>
 </html>

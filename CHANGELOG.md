@@ -10,6 +10,24 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.5.0] - 2026-10-08
+Visualização e navegação para celular. Validada por 681 testes automatizados e 232 verificações em Chromium real, em 5 perfis de aparelho.
+
+### Adicionado
+- **Navegação de celular:** abaixo de 720 px (e com o celular deitado) a barra de navegação vira uma **barra de 4 abas fixa embaixo** (Início, Indicação, Consumo, Proposta), com ícone e rótulo curto, ao alcance do polegar e respeitando a área do botão home do iPhone. O topo fica compacto, com o título, a chave de tema e a versão. Deitado, só os ícones.
+- **Uma única rolagem:** no celular o simulador ocupa a altura do conteúdo (`js/altura.js`), sem "rolagem dentro da rolagem".
+- **Campos e toques para celular** (`css/mobile.css`): fonte de 16 px nos campos (o iPhone não dá zoom ao tocar), alvos de toque de 44 px, sem atraso de toque, sem aumento automático de fonte e respeito ao notch em paisagem.
+- **Metadados de aparelho:** `viewport-fit=cover` (iPhone), `color-scheme` e `theme-color` claro/escuro (barra do navegador e modo escuro forçado do Samsung Internet). O zoom do usuário continua liberado.
+- **Perfis de teste:** iPhone 14/15 (390x844), Samsung Galaxy S23 (360x780) e Android padrão, Pixel 7 (412x915), mais iPhone SE (375x667) e um Android compacto (320x568) para os extremos, e o iPhone deitado.
+
+### Corrigido (encontrado nos testes em aparelho)
+- **Proposta:** no celular a prévia alargava a página para mais de 1.000 px e a rolagem horizontal aparecia. A coluna agora respeita a largura da tela e a prévia é reduzida para caber.
+- **Barra de abas:** a regra da barra de celular era vencida por uma regra mais específica e mostrava os nomes longos; ajustada.
+- **Celular deitado:** continuava com a barra do computador; agora usa a mesma barra inferior, só com ícones.
+
+### Alterado
+- Área de toque do interruptor de tema de 22 para 44 px no celular.
+
 ## [1.4.0] - 2026-10-08
 Estimativa da mensalidade AXS com a tabela de tarifas do comunicado de 30/09/2026. Validada por 627 testes automatizados e 25 testes em Chromium real.
 

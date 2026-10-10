@@ -11,6 +11,54 @@ const servidor = http.createServer((req, res) => {
   if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'Content-Type': TIPOS[path.extname(f)] || 'application/octet-stream' }); res.end(fs.readFileSync(f));
 });
+
+/* Perfis de aparelho: iPhone, Samsung e um Android "médio" (mais o iPhone SE e um Android compacto, para os extremos) */
+const PERFIS = [
+  { nome: 'iPhone 14/15 (390x844)', w: 390, h: 844, dpr: 3, ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' },
+  { nome: 'Samsung Galaxy S23 (360x780)', w: 360, h: 780, dpr: 3, ua: 'Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/23.0 Chrome/115.0.0.0 Mobile Safari/537.36' },
+  { nome: 'Android padrão, Pixel 7 (412x915)', w: 412, h: 915, dpr: 2.625, ua: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' },
+  { nome: 'iPhone SE (375x667)', w: 375, h: 667, dpr: 2, ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1' },
+  { nome: 'Android compacto (320x568)', w: 320, h: 568, dpr: 2, ua: 'Mozilla/5.0 (Linux; Android 9; Compact) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36' },
+];
+async function celulares(b, base, ok, erros) {
+  for (const pf of PERFIS) {
+    const ctx = await b.newContext({ viewport: { width: pf.w, height: pf.h }, deviceScaleFactor: pf.dpr, isMobile: true, hasTouch: true, userAgent: pf.ua, colorScheme: 'light' });
+    const p = await ctx.newPage(); p.on('pageerror', e => erros.push(pf.nome + ': ' + e.message));
+    const box = l => l.boundingBox(), tag = t => pf.nome + ': ' + t;
+    await p.goto(base + 'index.html#inicio'); await p.waitForTimeout(900);
+    const estouro = async () => p.evaluate(() => document.documentElement.scrollWidth);
+    ok(await estouro() <= pf.w + 1, tag('menu sem rolagem horizontal'), String(await estouro()));
+    const nav = await box(p.locator('.nav-links')); ok(nav && nav.y + nav.height >= pf.h - 2 && nav.height >= 48 && nav.height <= 90, tag('barra de abas fixa na base da tela'), JSON.stringify(nav && [Math.round(nav.y), Math.round(nav.height)]));
+    const abas = await p.locator('.nav-links a').all(); const medidas = []; for (const a of abas) medidas.push(await box(a));
+    ok(abas.length === 4 && medidas.every(m => m.width >= 60 && m.height >= 44), tag('4 abas com toque de pelo menos 44 px'), medidas.map(m => Math.round(m.width) + 'x' + Math.round(m.height)).join(' '));
+    const sw = await box(p.locator('.chave')); ok(sw.height >= 40, tag('interruptor de tema com área de toque de 40 px ou mais'), String(Math.round(sw.height)));
+    for (const [k, rotulo] of [['indicacao', 'indicação'], ['consumo', 'consumo'], ['proposta', 'proposta'], ['inicio', 'início']]) { await p.tap('.nav-links a[data-k=' + k + ']'); await p.waitForTimeout(500); ok((await p.locator('.nav-links a.ativo').getAttribute('data-k')) === k, tag('tocar na aba ' + rotulo + ' navega')); }
+    // cada tela dentro do menu
+    for (const rota of ['indicacao', 'consumo', 'proposta']) {
+      await p.goto(base + 'index.html#' + rota); await p.waitForTimeout(1500); const f = p.frameLocator('#frame');
+      const fb = await box(p.locator('#frame')), cb = await f.locator('body').evaluate(e => e.getBoundingClientRect().height), cw = await f.locator('html').evaluate(e => e.scrollWidth);
+      ok(Math.abs(fb.height - cb) <= 2, tag(rota + ': iframe do tamanho do conteúdo (uma só rolagem)'), Math.round(fb.height) + ' x ' + Math.round(cb));
+      ok(cw <= fb.width + 1 && await estouro() <= pf.w + 1, tag(rota + ': sem rolagem horizontal'), cw + ' / ' + fb.width);
+      await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await p.waitForTimeout(200);
+      const fim = await box(p.locator('#frame')), barra = await box(p.locator('.nav-links')); ok(fim.y + fim.height <= barra.y + 1, tag(rota + ': o fim da página não fica escondido atrás da barra'), Math.round(fim.y + fim.height) + ' x ' + Math.round(barra.y));
+      await p.evaluate(() => window.scrollTo(0, 0));
+      const campos = { indicacao: ['#fInd', '#fInv'], consumo: ['#dist', '#tipo', '#bandeira', '#m1'], proposta: ['#pCliente', '#pConsultor'] }[rota];
+      for (const c of campos) { const fonte = await f.locator(c).evaluate(e => parseFloat(getComputedStyle(e).fontSize)); const alt = (await f.locator(rota === 'indicacao' ? '.in' : c).first().boundingBox()).height; ok(fonte >= 16, tag(rota + ' ' + c + ': fonte de ' + fonte + ' px (o iPhone não dá zoom)')); ok(alt >= 43.5, tag(rota + ' ' + c + ': altura de toque ' + Math.round(alt) + ' px')); }
+      const botoes = { indicacao: ['#limpar'], consumo: ['#limpar'], proposta: ['#pdf', '#jpg', '#limpar'] }[rota];
+      for (const c of botoes) { const bb = await box(f.locator(c)); ok(bb.height >= 43.5, tag(rota + ' ' + c + ': botão com ' + Math.round(bb.height) + ' px de altura')); }
+      if (rota === 'consumo') { const m1 = await box(f.locator('#m1')), m2 = await box(f.locator('#m2')), a = await box(f.locator('.col-a')), bcol = await box(f.locator('.col-b')); ok(Math.abs(m1.y - m2.y) < 2 && m2.x > m1.x, tag('consumo: meses em 2 colunas')); ok(bcol.y < a.y, tag('consumo: dados do lead aparecem antes dos demais cartões')); }
+      if (rota === 'proposta') { const wv = await box(f.locator('#prevWrap')), esc = await f.locator('#capture').evaluate(e => e.style.transform); ok(wv.width <= pf.w && /scale\(0\.\d+/.test(esc), tag('proposta: prévia reduzida para caber na tela (' + esc + ')')); }
+    }
+    await ctx.close();
+  }
+  // celular deitado (iPhone 14/15)
+  const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: 'light' });
+  const p = await ctx.newPage(); await p.goto(base + 'index.html#consumo'); await p.waitForTimeout(1300);
+  const nav = await p.locator('.nav-links').boundingBox(); ok(nav.height <= 56 && nav.y + nav.height >= 388, 'iPhone deitado: barra de abas compacta (só ícones)', String(Math.round(nav.height)));
+  ok(await p.evaluate(() => document.documentElement.scrollWidth) <= 845, 'iPhone deitado: sem rolagem horizontal');
+  await ctx.close();
+}
+
 (async () => {
   await new Promise(r => servidor.listen(0, r)); const base = 'http://localhost:' + servidor.address().port + '/';
   const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox'] });
@@ -74,6 +122,7 @@ const servidor = http.createServer((req, res) => {
   ok(tCargo.y - (tAt.y + tAt.height) >= 55, 'proposta: espaço livre para o nome entre "Atenciosamente," e o cargo', String(Math.round(tCargo.y - (tAt.y + tAt.height))));
   await f.locator('.px-signature').scrollIntoViewIfNeeded(); await p.screenshot({ path: '/tmp/_assinatura.png' });
   await p.context().close();
+  await celulares(b, base, ok, erros);
   ok(!erros.length, 'nenhum erro de script no navegador', erros.join(' | '));
   await b.close(); servidor.close();
   console.log(`Aprovados: ${pass}   Reprovados: ${fail}`); falhas.forEach(x => console.log(' x ' + x)); process.exit(fail ? 1 : 0);

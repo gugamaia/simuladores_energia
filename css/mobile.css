@@ -1,0 +1,33 @@
+/* Ajustes para celular (iPhone, Samsung/Android e telas pequenas). Carregado por todas as páginas, depois do css da página. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}   /* notch em paisagem */
+button,a,input,select,summary,label{touch-action:manipulation}                             /* sem atraso de toque */
+img,table{max-width:100%}
+
+/* telas de toque: alvos de 44 px e fonte >= 16 px (o iPhone dá zoom em campos menores) */
+@media (pointer:coarse), (max-width:720px){
+  input,select,textarea{font-size:16px}
+  button,select,input[type=text],input[type=number],input[type=date],.btn,.btn-limpar,.in{min-height:44px}
+  td input{min-height:36px}
+  input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;display:block}
+  details>summary{padding:10px 0}
+  .chk{padding:6px 0}
+  .btn,.btn-limpar{padding-left:18px;padding-right:18px}
+}
+
+/* celulares estreitos (360 a 430 px) */
+@media (max-width:480px){
+  main{padding:12px}
+  .card{padding:14px}
+  header h1{font-size:1.05rem}
+  header{padding:12px}
+  .hint{font-size:.9rem}
+  .row b{white-space:normal;text-align:right}
+  .row{gap:8px}
+}
+/* muito estreitos (320 px) */
+@media (max-width:340px){
+  main{padding:8px}
+  .card{padding:12px}
+  .months{gap:6px 8px}
+}

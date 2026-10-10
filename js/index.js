@@ -7,6 +7,14 @@ const TOOLS = {
 };
 const $ = id => document.getElementById(id);
 
+/* ---- Celular: o iframe ganha a altura do conteúdo (uma rolagem só). Fora do celular, preenche a tela. ---- */
+const CELULAR = window.matchMedia ? window.matchMedia('(max-width:720px), (max-height:480px) and (pointer:coarse)') : {matches:false};
+function ajustarAltura(px){
+  const f = $('frame');
+  if(CELULAR.matches && px > 0) f.style.height = Math.ceil(px) + 'px'; else f.style.height = '';
+}
+if(CELULAR.addEventListener) CELULAR.addEventListener('change', ()=>{ $('frame').style.height = ''; });
+
 /* ---- Tema claro/escuro (js/tema.js) ---- */
 function enviarTema(){ const f = $('frame').contentWindow; if(f) f.postMessage({tipo:'tema', tema:Tema.atual()}, '*'); }
 function pintarTema(){ $('tema').checked = Tema.atual() === 'escuro'; }   // chave ligada = tema escuro
@@ -46,6 +54,7 @@ window.addEventListener('message', e=>{
   if(d.tipo==='simulacao' && TOOLS[d.ferramenta]) contar('simulacao-'+d.ferramenta, 'Simula\u00e7\u00e3o - '+TOOLS[d.ferramenta].titulo);
   if(d.tipo==='proposta') contar('proposta-gerada', 'Proposta gerada');
   if(d.tipo==='tema-pedir') enviarTema();
+  if(d.tipo==='altura') ajustarAltura(d.px);
 });
 
 /* ---- Painel de uso ---- */

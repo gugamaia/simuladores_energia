@@ -97,5 +97,6 @@ $('pdf').addEventListener('click', () => exportar('pdf'));
 $('jpg').addEventListener('click', () => exportar('jpg'));
 $('limpar').addEventListener('click', limpar);
 window.addEventListener('resize', ajustarEscala);
+if(window.ResizeObserver) new ResizeObserver(ajustarEscala).observe($('prevWrap'));   // acompanha o tamanho real da coluna (celular, girar a tela)
 $('imgBanner').addEventListener('load', ajustarEscala);
 atualizar();

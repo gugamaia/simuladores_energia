@@ -632,6 +632,45 @@ async function mensalidade() {
   ok(erros === 0, 'propriedade (100 casos aleatórios): média estimada mensal e mensalidade', erros + ' divergências. ' + amostra); w2.close();
 }
 
+/* ======================= N) CELULAR ======================= */
+async function celular() {
+  section('N) Celular: viewport, barra inferior, campos de 16 px / toques de 44 px e altura do iframe');
+  const lerS = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  for (const pg of ['index', 'indicacao', 'consumo', 'proposta']) {
+    const h = lerS(pg + '.html');
+    ok(/<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">/.test(h), pg + ': viewport com viewport-fit=cover (iPhone com notch)');
+    ok(/<meta name="color-scheme" content="light dark">/.test(h) && (h.match(/<meta name="theme-color"/g) || []).length === 2, pg + ': color-scheme e theme-color claro/escuro (barra do navegador e modo escuro forçado do Samsung)');
+    ok(/css\/mobile\.css\?v=/.test(h) && h.indexOf('css/mobile.css') > h.indexOf('css/' + pg + '.css'), pg + ': mobile.css carregado depois do css da página');
+    ok(/user-scalable\s*=\s*no|maximum-scale/.test(h) === false, pg + ': zoom do usuário não é bloqueado (acessibilidade)');
+    ok(pg === 'index' ? !/js\/altura\.js/.test(h) : /js\/altura\.js\?v=/.test(h), pg + (pg === 'index' ? ': menu não usa altura.js' : ': informa a altura ao menu (altura.js)'));
+  }
+  const mc = lerS('css/mobile.css'), ic = lerS('css/index.css');
+  ok(/text-size-adjust:100%/.test(mc) && /pointer:coarse/.test(mc) && /min-height:44px/.test(mc) && /font-size:16px/.test(mc) && /safe-area-inset-left/.test(mc) && /touch-action:manipulation/.test(mc), 'mobile.css: sem aumento de fonte do iOS, fonte 16 px, alvos de 44 px, notch e toque sem atraso');
+  const bloco = ic.slice(ic.indexOf('@media (max-width:720px), (max-height:480px) and (pointer:coarse)'));
+  ok(/position:fixed/.test(bloco) && /bottom:0/.test(bloco) && /safe-area-inset-bottom/.test(bloco) && /repeat\(4,1fr\)/.test(bloco) && /attr\(data-ic\)/.test(bloco) && /attr\(data-curto\)/.test(bloco), 'index.css: no celular a navegação vira barra de 4 abas fixa embaixo, respeitando a área do botão home do iPhone');
+  ok(/@media \(max-height:480px\) and \(pointer:coarse\)\{/.test(ic) && /\.nav-links a::after\{display:none\}/.test(ic), 'index.css: celular deitado usa a mesma barra, só com os ícones');
+  const w = await open('index.html'); const links = [...w.document.querySelectorAll('#nav .nav-links a')];
+  ok(links.length === 4 && links.every(a => a.dataset.ic && a.dataset.curto && a.getAttribute('aria-label') === a.textContent.trim()), 'abas: ícone, rótulo curto e nome completo acessível (aria-label) em cada uma', links.map(a => a.dataset.curto).join('|'));
+  w.close();
+  // altura do iframe (só no celular)
+  const mm = movel => x => { x.matchMedia = q => ({ matches: !!movel && /max-width:720px/.test(q), media: q, addEventListener() {}, removeEventListener() {} }); };
+  let h = await open('index.html', { hash: '#consumo', beforeParse: mm(true) }); await sleep(800); let src = $(h, 'frame').contentWindow;
+  const alt = (px, s) => { h.dispatchEvent(new h.MessageEvent('message', { data: { tipo: 'altura', px }, source: s })); };
+  alt(1234.2, src); ok($(h, 'frame').style.height === '1235px', 'celular: iframe ganha a altura do conteúdo (1.234,2 -> 1235 px)', $(h, 'frame').style.height);
+  alt(900, src); ok($(h, 'frame').style.height === '900px', 'celular: altura acompanha o conteúdo quando ele encolhe');
+  alt(-5, src); ok($(h, 'frame').style.height === '', 'altura inválida volta ao padrão do css');
+  alt(700, h); ok($(h, 'frame').style.height === '', 'mensagem de altura que não vem do iframe é ignorada');
+  h.close();
+  h = await open('index.html', { hash: '#consumo', beforeParse: mm(false) }); await sleep(800); src = $(h, 'frame').contentWindow;
+  h.dispatchEvent(new h.MessageEvent('message', { data: { tipo: 'altura', px: 1500 }, source: src })); ok($(h, 'frame').style.height === '', 'computador/tablet: o iframe continua preenchendo a tela (altura não é fixada)');
+  h.close();
+  // o simulador informa a altura ao menu
+  h = await open('index.html', { hash: '#indicacao' }); const msgs = []; h.postMessage = m => { if (m && m.tipo === 'altura') msgs.push(m); }; await sleep(800);
+  const c = $(h, 'frame').contentWindow; c.document.body.getBoundingClientRect = () => ({ height: 777.4 }); c.dispatchEvent(new c.Event('resize')); await sleep(100);
+  ok(msgs.some(m => m.px === 778), 'simulador informa ao menu a altura do conteúdo (777,4 -> 778)', JSON.stringify(msgs)); h.close();
+  const solo = await open('indicacao.html'); const m2 = []; solo.postMessage = m => m2.push(m); solo.document.body.getBoundingClientRect = () => ({ height: 500 }); solo.dispatchEvent(new solo.Event('resize')); await sleep(50); ok(!m2.length, 'fora do menu o simulador não envia altura'); solo.close();
+}
+
 /* ======================= F) MENU/HUB, ESTATÍSTICAS E RASTREIO ======================= */
 async function hub() {
   section('F) Menu, navegação, estatísticas e contagem');
@@ -695,7 +734,7 @@ async function rastreio() {
 
 (async () => {
   const t0 = Date.now();
-  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, mensalidade, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
+  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, mensalidade, celular, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
   console.log('\n' + '='.repeat(60) + `\nAprovados: ${pass}   Reprovados: ${fail}   Avisos: ${warns.length}   (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('\nFALHAS:'); fails.forEach(f => console.log(' x ' + f)); }
   if (warns.length) { console.log('\nAVISOS:'); [...new Set(warns)].forEach(f => console.log(' ! ' + f)); }
