@@ -2,18 +2,39 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f161c" media="(prefers-color-scheme: dark)">
 <title>Simuladores</title>
-<link rel="stylesheet" href="css/index.css">
+<link rel="stylesheet" href="css/tema.css?v=1.5.1">
+<link rel="stylesheet" href="css/index.css?v=1.5.1">
+<link rel="stylesheet" href="css/mobile.css?v=1.5.1">
+<script src="js/tema.js?v=1.5.1"></script>
 </head>
 <body>
-<header>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+<header id="topo">
   <nav id="nav" aria-label="Navega&ccedil;&atilde;o principal">
-    <a href="#inicio" data-k="inicio">P&aacute;gina principal</a>
-    <a href="#indicacao" data-k="indicacao">Simula&ccedil;&atilde;o de indica&ccedil;&atilde;o</a>
-    <a href="#consumo" data-k="consumo">Simula&ccedil;&atilde;o de consumo de energia</a>
+    <span class="nav-esq" aria-hidden="true"></span>
+    <div class="nav-links">
+      <a href="#inicio" data-k="inicio" data-ic="&#127968;" data-curto="Início" aria-label="Página principal">P&aacute;gina principal</a>
+      <a href="#indicacao" data-k="indicacao" data-ic="&#127873;" data-curto="Indicação" aria-label="Simulação de indicação">Simula&ccedil;&atilde;o de indica&ccedil;&atilde;o</a>
+      <a href="#consumo" data-k="consumo" data-ic="&#9889;" data-curto="Consumo" aria-label="Simulação de consumo de energia">Simula&ccedil;&atilde;o de consumo de energia</a>
+      <a href="#proposta" data-k="proposta" data-ic="&#128196;" data-curto="Proposta" aria-label="Proposta de oferta">Proposta de oferta</a>
+    </div>
+    <div class="nav-dir">
+      <label class="chave" title="Alternar entre tema claro e escuro">
+        <span class="chave-lado lado-claro"><span aria-hidden="true">&#9728;</span><span class="chave-txt">Claro</span></span>
+        <input type="checkbox" id="tema" role="switch" aria-label="Tema escuro">
+        <span class="chave-trilho" aria-hidden="true"><span class="chave-bolinha"></span></span>
+        <span class="chave-lado lado-escuro"><span aria-hidden="true">&#127769;</span><span class="chave-txt">Escuro</span></span>
+      </label>
+      <span class="versao" id="versaoNav"></span>
+    </div>
   </nav>
 </header>
+<main id="conteudo" tabindex="-1">
 <div id="menu">
   <h1>Simuladores</h1>
   <p class="sub">Escolha qual simula&ccedil;&atilde;o deseja realizar.</p>
@@ -26,22 +47,30 @@
       <div class="ico">&#9889;</div><h2>M&eacute;dia e necessidade de consumo</h2>
       <p>Calcule a m&eacute;dia dos &uacute;ltimos meses, some AC, outros produtos e gera&ccedil;&atilde;o, e confira se o cliente atinge o m&iacute;nimo da faixa de atendimento.</p>
     </button>
+    <button class="opt" data-k="proposta" type="button">
+      <div class="ico">&#128196;</div><h2>Proposta de oferta</h2>
+      <p>Preencha os valores da economia e baixe a proposta da AXS Energia em PDF ou JPG.</p>
+    </button>
   </div>
   <section id="stats" hidden>
     <h3>Uso da ferramenta</h3>
     <div class="kpis">
       <div class="kpi"><b id="kAcessos">-</b><span>Acessos</span></div>
       <div class="kpi"><b id="kSims">-</b><span>Simula&ccedil;&otilde;es realizadas</span><span id="kSimsDet"></span></div>
+      <div class="kpi"><b id="kProps">-</b><span>Propostas geradas</span></div>
     </div>
     <h3 class="mt-18">Top 5 localidades</h3>
     <ul id="top5"><li class="mute">Carregando...</li></ul>
     <p class="priv">Estat&iacute;sticas an&ocirc;nimas, sem cookies e sem dados pessoais. A localidade &eacute; estimada pelo pa&iacute;s/regi&atilde;o do acesso.</p>
   </section>
+  <p class="rodape" id="versao"></p>
 </div>
 <div id="tool">
   <iframe id="frame" title="Simulador"></iframe>
 </div>
-<script src="config.js"></script>
-<script src="js/index.js"></script>
+</main>
+<script src="config.js?v=1.5.1"></script>
+<script src="versao.js?v=1.5.1"></script>
+<script src="js/index.js?v=1.5.1"></script>
 </body>
 </html>

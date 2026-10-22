@@ -1,15 +1,14 @@
-:root{--bg:#f3f5f7;--card:#fff;--ink:#14212b;--mute:#5d6b76;--line:#d9e0e5;--head:#1f4e79;--in:#fff3d1;
---okbg:#e2f4ec;--ok:#0f7b4f;--nobg:#fde6e6;--no:#b3261e;--warnbg:#ffe9cf;--warn:#a85d00}
-@media (prefers-color-scheme:dark){:root{--bg:#0f161c;--card:#18222b;--ink:#e8eef2;--mute:#93a2ae;--line:#2b3842;--head:#17375a;--in:#3a331c;
---okbg:#153429;--ok:#5fd1a0;--nobg:#3a1c1c;--no:#ff8f86;--warnbg:#3b2a14;--warn:#ffb95e}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,Arial,sans-serif}
 header{background:var(--head);color:#fff;text-align:center;padding:16px}
 header h1{margin:0;font-size:1.25rem}
-main{max-width:900px;margin:0 auto;padding:16px}
-.hint{color:var(--mute);font-style:italic;margin:0 0 16px}
-.layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:700px){.layout{grid-template-columns:1fr}}
+main{max-width:1400px;margin:0 auto;padding:16px}
+.hint{color:var(--mute);font-style:italic;text-align:center;max-width:760px;margin:0 auto 16px}
+/* 3 colunas: [importar/AC/produtos/geração] [dados do lead] [resultado/parâmetros] */
+.layout{display:grid;grid-template-columns:repeat(3,minmax(0,370px));justify-content:space-between;gap:16px;align-items:start}
+@media(max-width:1180px){.layout{grid-template-columns:repeat(2,minmax(0,1fr));justify-content:stretch}}
+@media(max-width:720px){.layout{grid-template-columns:minmax(0,1fr)}.col-b{order:1}.col-c{order:2}.col-a{order:3}}
+.col-a,.col-b,.col-c{min-width:0}   /* as tabelas largas rolam dentro do cartão em vez de alargar a página */
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
 h2{font-size:1rem;margin:0 0 12px}
 label{display:block;font-weight:600;font-size:.9rem;margin:10px 0 4px}
@@ -58,10 +57,25 @@ input[type=file]{width:100%}
 .badge{font-weight:400;color:var(--mute);margin-left:6px}
 .achead{color:var(--mute);font-size:.8rem;font-weight:600}
 .mes.out{border:2px solid var(--warn);background:var(--warnbg)}
-.alerta{background:var(--warnbg);border-left:4px solid var(--warn);border-radius:6px;padding:10px 12px;margin-top:12px;font-size:.88rem}
-.alerta ul{margin:6px 0;padding-left:20px}
 .x{border:0;background:transparent;color:var(--no);font-size:1.2rem;cursor:pointer}
 
 /* utilitarios */
 .mt-14{margin-top:14px}
 .mt-18{margin-top:18px}
+.dispgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dispgrid label{margin:6px 0 0}
+#tarifas input{width:74px;padding:4px 6px}
+#tarifas td:first-child{white-space:nowrap;font-size:.85rem}
+#bandeiraInfo{display:block;color:var(--mute);font-size:.8rem;margin-top:4px}
+.mes[aria-invalid="true"]{outline:2px solid var(--no)}
+/* E-02: a lista de produtos e as linhas de AC não podem alargar a coluna no celular */
+.orow>*,.acrow>*{min-width:0}
+.orow span{overflow-wrap:anywhere}
+@media(max-width:480px){.orow{font-size:.8rem;gap:6px}.orow input{padding:6px 4px}}
+/* E-02 (causa real): os formulários de "adicionar distribuidora" e "adicionar produto" tinham campos que não encolhiam e alargavam a página no celular */
+.addrow>*,.oadd>*{min-width:0}
+@media(max-width:480px){
+  .addrow{grid-template-columns:repeat(3,minmax(0,1fr))}.addrow input:first-child{grid-column:1/-1}
+  .oadd{grid-template-columns:repeat(2,minmax(0,1fr))}.oadd input:first-child{grid-column:1/-1}
+}
+.scroll{position:relative}   /* contém o texto .sr-only da coluna "Remover" (senão ele alarga a página em 280 px) */

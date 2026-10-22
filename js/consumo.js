@@ -1,13 +1,8 @@
 /* Tabela de parâmetros: edite aqui para incluir/alterar distribuidoras e mínimos. */
-const DEFAULTS = {
-  "CEMIG - MG":       {"Monofásico":153,"Bifásico":173,"Trifásico":223},
-  "COPEL - PR":       {"Monofásico":189,"Bifásico":209,"Trifásico":259},
-  "CPFL Paulista - SP":{"Monofásico":250,"Bifásico":270,"Trifásico":320},
-  "ELEKTRO - SP":     {"Monofásico":250,"Bifásico":270,"Trifásico":320},
-  "ENERGISA - MT":    {"Monofásico":210,"Bifásico":230,"Trifásico":280},
-  "EQUATORIAL - GO":  {"Monofásico":156,"Bifásico":176,"Trifásico":226}
-};
-const DESCONTO_SOCIAL = 200;
+/* Parâmetros vêm de parametros.js (fonte única). */
+const P = window.PARAMETROS || {versao:'indisponivel', atualizadoEm:'', descontoSocial:200, acs:[], distribuidoras:{}};
+const DEFAULTS = P.distribuidoras;
+const DESCONTO_SOCIAL = Number.isFinite(P.descontoSocial) ? P.descontoSocial : 200;
 const TIPOS = ["Monofásico","Bifásico","Trifásico"];
 /* Valida o que veio do armazenamento do navegador: formato inválido volta aos padrões */
 function sanear(p){
@@ -20,10 +15,44 @@ function sanear(p){
   });
   return Object.keys(out).length ? out : null;
 }
-const KEY = 'validador-lead-params-v1';
+const KEY = 'validador-lead-params-v2', ACKEY = 'validador-lead-ac-v2';
+/* Custo de disponibilidade (kWh/mês por tipo): descontado de cada mês na energia compartilhada estimada */
+function saneDisp(d){ return d && typeof d === 'object' && TIPOS.every(k=>Number.isFinite(d[k]) && d[k] >= 0) ? {"Monofásico":d["Monofásico"],"Bifásico":d["Bifásico"],"Trifásico":d["Trifásico"]} : null; }
+const DISP_PADRAO = saneDisp(P.disponibilidade) || {"Monofásico":30,"Bifásico":50,"Trifásico":100};
+let DISP = JSON.parse(JSON.stringify(DISP_PADRAO));
+/* Tarifa AXS (R$/kWh) por distribuidora e bandeira: usada para estimar a mensalidade */
+const TAX = P.tarifasAXS || {};
+const BANDEIRAS = Array.isArray(TAX.bandeiras) && TAX.bandeiras.length ? TAX.bandeiras : [];
+const copia = o => JSON.parse(JSON.stringify(o));
+const linhaOk = l => !!l && typeof l === 'object' && BANDEIRAS.length > 0 && BANDEIRAS.every(b=>Number.isFinite(l[b]) && l[b] >= 0);
+function saneTarifas(t){
+  if(!t || typeof t !== 'object' || Array.isArray(t)) return null;
+  const out = {};
+  Object.keys(t).forEach(d=>{
+    const v = t[d];
+    if(linhaOk(v)) out[d] = copia(v);
+    else if(v && typeof v === 'object' && Object.keys(v).length && Object.values(v).every(linhaOk)) out[d] = copia(v);   // com faixas (Copel)
+  });
+  return Object.keys(out).length ? out : null;
+}
+const TARIFAS_PADRAO = saneTarifas(TAX.valores) || {};
+let TARIFAS = copia(TARIFAS_PADRAO);
+const temFaixas = d => !!(BANDEIRAS.length && TARIFAS[d] && typeof TARIFAS[d][BANDEIRAS[0]] !== 'number');
+function tarifaAXS(d, b, f){
+  const t = TARIFAS[d]; if(!t) return null;
+  const linha = temFaixas(d) ? t[f || Object.keys(t)[0]] : t, v = linha ? linha[b] : null;
+  return Number.isFinite(v) ? v : null;
+}
 let PARAMS = JSON.parse(JSON.stringify(DEFAULTS));
-try{ const sv = localStorage.getItem(KEY); const p = sv ? sanear(JSON.parse(sv)) : null; if(p) PARAMS = p; }catch(e){}
-function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify(PARAMS)); }catch(e){} }
+let RASCUNHO_DESCARTADO = false;   // ajustes locais de uma versão antiga da tabela
+try{
+  const sv = localStorage.getItem(KEY);
+  if(sv){
+    const o = JSON.parse(sv), p = (o && o.versao === P.versao) ? sanear(o.params) : null;
+    if(p){ PARAMS = p; const dd = saneDisp(o.disp); if(dd) DISP = dd; const tt = saneTarifas(o.tarifas); if(tt) TARIFAS = tt; } else { RASCUNHO_DESCARTADO = true; localStorage.removeItem(KEY); }
+  } else if(localStorage.getItem('validador-lead-params-v1')){ RASCUNHO_DESCARTADO = true; localStorage.removeItem('validador-lead-params-v1'); }
+}catch(e){}
+function salvar(){ try{ localStorage.setItem(KEY, JSON.stringify({versao:P.versao, params:PARAMS, disp:DISP, tarifas:TARIFAS})); }catch(e){} }
 const esc = t => String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 const $ = id => document.getElementById(id);
@@ -31,7 +60,7 @@ const fmt = v => v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFracti
 
 // montar selects, meses e tabela
 let mh = '';
-for(let i=1;i<=12;i++){const n=String(i).padStart(2,'0'); mh += `<div><label for="m${i}">Mês ${n}</label><input type="number" id="m${i}" class="mes" min="0" step="1" inputmode="decimal"></div>`;}
+for(let i=1;i<=12;i++){const n=String(i).padStart(2,'0'); mh += `<div><label for="m${i}">Mês ${n}</label><input type="number" id="m${i}" class="mes" min="0" max="1000000" step="1" inputmode="decimal"></div>`;}
 $('months').innerHTML = mh;
 
 function renderDist(){
@@ -42,8 +71,8 @@ function renderDist(){
 function renderParams(){
   $('params').innerHTML = Object.entries(PARAMS).map(([d,t])=>
     `<tr data-d="${esc(d)}"><td>${esc(d)}</td>` +
-    TIPOS.map(k=>`<td><input type="number" min="0" step="1" data-k="${k}" value="${t[k]}"></td>`).join('') +
-    `<td><button type="button" class="x" title="Remover" data-del="1">×</button></td></tr>`).join('');
+    TIPOS.map(k=>`<td><input type="number" min="0" step="1" data-k="${k}" value="${t[k]}" aria-label="${esc(d)}, ${k}: consumo mínimo em kWh"></td>`).join('') +
+    `<td><button type="button" class="x" title="Remover" aria-label="Remover ${esc(d)}" data-del="1">×</button></td></tr>`).join('');
 }
 function refresh(){ salvar(); renderDist(); renderParams(); calc(); }
 $('params').addEventListener('input',e=>{
@@ -57,20 +86,80 @@ $('params').addEventListener('click',e=>{
   if(confirm('Remover '+d+'?')){ delete PARAMS[d]; refresh(); }
 });
 $('add').addEventListener('click',()=>{
-  const nome=$('nNome').value.trim(), v=['nMono','nBi','nTri'].map(id=>parseFloat($(id).value));
+  const nome=$('nNome').value.trim().slice(0,40), v=['nMono','nBi','nTri'].map(id=>parseFloat($(id).value));
   if(!nome || v.some(x=>isNaN(x)||x<0)){ alert('Informe o nome e os três mínimos.'); return; }
   PARAMS[nome]={"Monofásico":v[0],"Bifásico":v[1],"Trifásico":v[2]};
   ['nNome','nMono','nBi','nTri'].forEach(id=>$(id).value='');
   refresh();
 });
 $('restaurar').addEventListener('click',()=>{
-  if(confirm('Restaurar os parâmetros originais? As alterações serão perdidas.')){ PARAMS=JSON.parse(JSON.stringify(DEFAULTS)); refresh(); }
+  if(confirm('Restaurar os parâmetros da tabela vigente? Os ajustes locais serão perdidos.')){
+    PARAMS = JSON.parse(JSON.stringify(DEFAULTS));
+    AC = JSON.parse(JSON.stringify(AC_DEFAULT));
+    try{ localStorage.removeItem(ACKEY); }catch(e){}
+    document.querySelectorAll('.ack').forEach((k,i)=>{ if(AC[i]) k.value = AC[i].kwh; });
+    DISP = JSON.parse(JSON.stringify(DISP_PADRAO)); pintarDisp();
+    TARIFAS = copia(TARIFAS_PADRAO); renderTarifas();
+    RASCUNHO_DESCARTADO = false; refresh();
+  }
 });
+/* Exporta a tabela atual como parametros.js (já com nova versão) para publicar no repositório */
+$('exportar').addEventListener('click',()=>{
+  const agora = new Date();
+  const dados = {
+    versao: agora.toISOString().slice(0,16).replace(/[-:T]/g,''),
+    atualizadoEm: agora.toLocaleDateString('pt-BR'),
+    descontoSocial: DESCONTO_SOCIAL, disponibilidade: DISP, tarifasAXS: Object.assign({}, TAX, {valores: TARIFAS}), acs: AC, distribuidoras: PARAMS
+  };
+  const conteudo = '/* Gerado pelo simulador em ' + agora.toLocaleString('pt-BR') + '. Substitua o parametros.js do repositório por este arquivo. */\nwindow.PARAMETROS = ' + JSON.stringify(dados,null,2) + ';\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([conteudo],{type:'text/javascript'}));
+  a.download = 'parametros.js'; document.body.appendChild(a); a.click(); a.remove();
+});
+const DISP_IDS = {dispMono:'Monofásico', dispBi:'Bifásico', dispTri:'Trifásico'};
+function pintarDisp(){ Object.entries(DISP_IDS).forEach(([id,t])=>{ $(id).value = DISP[t]; }); }
+Object.entries(DISP_IDS).forEach(([id,t])=>{
+  $(id).addEventListener('input',()=>{ const v = parseFloat($(id).value); if(Number.isFinite(v) && v >= 0){ DISP[t] = v; salvar(); calc(); } });
+});
+pintarDisp();
+/* tabela editável da tarifa AXS + seletor de bandeira */
+function renderTarifas(){
+  const linhas = [];
+  Object.keys(TARIFAS).forEach(d=>{
+    const fx = temFaixas(d) ? Object.keys(TARIFAS[d]) : [null];
+    fx.forEach(f=>{
+      const lin = f ? TARIFAS[d][f] : TARIFAS[d];
+      linhas.push('<tr data-d="'+esc(d)+'"'+(f ? ' data-f="'+esc(f)+'"' : '')+'><td>'+esc(d)+(f ? ' · '+esc(f) : '')+'</td>'
+        + BANDEIRAS.map(b=>'<td><input type="number" min="0" step="0.00001" data-b="'+esc(b)+'" value="'+lin[b]+'" aria-label="Tarifa AXS '+esc(d)+(f ? ' '+esc(f) : '')+', bandeira '+esc(b)+' (R$/kWh)"></td>').join('')+'</tr>');
+    });
+  });
+  $('tarifas').innerHTML = linhas.join('');
+}
+$('tarifas').addEventListener('input',e=>{
+  const i = e.target, tr = i.closest('tr'); if(!tr || !i.dataset.b) return;
+  const v = parseFloat(i.value); if(!Number.isFinite(v) || v < 0) return;
+  const d = tr.dataset.d, f = tr.dataset.f, lin = f ? TARIFAS[d][f] : TARIFAS[d];
+  lin[i.dataset.b] = v; salvar(); calc();
+});
+$('bandeira').innerHTML = BANDEIRAS.map(b=>'<option>'+esc(b)+'</option>').join('');
+if(BANDEIRAS.includes(TAX.bandeiraPadrao)) $('bandeira').value = TAX.bandeiraPadrao;
+$('bandeiraInfo').textContent = BANDEIRAS.length ? 'Tarifas AXS vigentes desde ' + (TAX.vigenteDesde || '–') + '. Bandeira de ' + (TAX.bandeiraReferencia || 'referência') + ': ' + (TAX.bandeiraPadrao || '–') + '.' : '';
+renderTarifas();
+function infoParametros(){
+  const mudou = JSON.stringify(PARAMS) !== JSON.stringify(DEFAULTS) || JSON.stringify(AC) !== JSON.stringify(AC_DEFAULT) || JSON.stringify(DISP) !== JSON.stringify(DISP_PADRAO) || JSON.stringify(TARIFAS) !== JSON.stringify(TARIFAS_PADRAO);
+  $('paramInfo').textContent = 'Tabela vigente: versão ' + P.versao + (P.atualizadoEm ? ' (atualizada em ' + P.atualizadoEm + ')' : '') + '.'
+    + (!Object.keys(DEFAULTS).length ? ' ATENÇÃO: o arquivo parametros.js não foi carregado.' : '')
+    + (mudou ? ' Há ajustes locais ainda não publicados: use "Exportar parametros.js".' : '')
+    + (RASCUNHO_DESCARTADO ? ' Seus ajustes locais antigos foram descartados porque a tabela foi atualizada.' : '');
+  const sm = document.querySelector('#social').closest('label').querySelector('small');
+  if(sm) sm.textContent = 'Desconta ' + DESCONTO_SOCIAL + ' kWh da média antes de comparar com o mínimo.';
+}
 renderDist(); renderParams();
 
 function calc(){
   const meses = [...document.querySelectorAll('.mes')].map((inp,idx)=>({idx,raw:inp.value.trim()}))
-    .filter(m=>m.raw!=='' && !isNaN(m.raw) && Number(m.raw)>=0).map(m=>({idx:m.idx,v:Number(m.raw)}));
+    .filter(m=>m.raw!=='' && !isNaN(m.raw) && Number(m.raw)>=0 && Number(m.raw)<=1000000).map(m=>({idx:m.idx,v:Number(m.raw)}));
+  document.querySelectorAll('.mes').forEach(inp=>{ const v = inp.value.trim(); inp.setAttribute('aria-invalid', (v !== '' && !(Number(v) >= 0 && Number(v) <= 1000000)) ? 'true' : 'false'); });   // fora de 0 a 1.000.000 kWh: ignorado e marcado
   const mediaTodos = meses.length ? meses.reduce((a,m)=>a+m.v,0)/meses.length : null;
   const limite = (parseFloat($('limiar').value) || 30)/100;
   const outliers = (meses.length>=3 && mediaTodos>0) ? meses.filter(m=>Math.abs(m.v-mediaTodos)/mediaTodos > limite) : [];
@@ -84,7 +173,7 @@ function calc(){
   const minimo = (dist && tipo && PARAMS[dist] && Number.isFinite(PARAMS[dist][tipo])) ? PARAMS[dist][tipo] : null;
 
   $('qtd').textContent = qtd + (EXCL.size ? ` (${EXCL.size} desconsiderado${EXCL.size>1?'s':''})` : '');
-  checarVariacao();
+  infoParametros();
   $('total').textContent = qtd ? fmt(vals.reduce((a,b)=>a+b,0)) : '–';
   $('relogio').textContent = tipo || '–';
   $('media').textContent = media===null ? '–' : fmt(media);
@@ -104,11 +193,37 @@ function calc(){
   $('gPrev').textContent = prev==='–' ? '' : 'Com a média de consumo atual, o saldo dura ' + prev + '.';
   $('desc').textContent = social ? '− ' + fmt(DESCONTO_SOCIAL) : 'Não se aplica';
   $('minimo').textContent = minimo===null ? '–' : minimo;
+  // consumo anual estimado (média SEM subtrações) e energia compartilhada estimada no ano:
+  // cada mês informado (+ consumo extra esperado: AC, outros produtos, geração) menos a disponibilidade do tipo, mínimo 0
+  const adic = extra + outros + ger, disp = tipo ? DISP[tipo] : null;
+  const consAno = qtd ? (media + adic) * 12 : null;
+  let comp = null;
+  if(disp != null && qtd) comp = vals.map(v=>Math.max(0, v + adic - disp)).reduce((a,b)=>a+b,0) / qtd * 12;
+  $('consAno').textContent = consAno === null ? '–' : fmt(consAno);
+  $('dispVal').textContent = disp != null ? fmt(disp) : '–';
+  $('compAno').textContent = comp === null ? '–' : fmt(comp);
+  $('compNota').hidden = comp === null;
+  const semPiso = comp !== null && vals.every(v => v + adic - disp >= 0);   // nenhum mês ficou abaixo da disponibilidade
+  $('compNota').textContent = comp === null ? '' : (qtd < 12 ? 'Projeção para 12 meses a partir de ' + qtd + (qtd === 1 ? ' mês informado. ' : ' meses informados. ') : '')
+    + (semPiso ? 'Cálculo: (média ' + fmt(media + adic) + ' − disponibilidade ' + fmt(disp) + ') × 12 = ' + fmt(comp) + ' kWh.'
+               : 'Cálculo: cada mês' + (adic > 0 ? ' (com o consumo extra)' : '') + ' − ' + fmt(disp) + ' kWh de disponibilidade, mínimo 0, projetado para 12 meses = ' + fmt(comp) + ' kWh.')
+    + ' A média considerada, usada na comparação com o mínimo, não tem essa subtração.';
+  // mensalidade AXS estimada = (média − disponibilidade) × tarifa AXS da distribuidora/bandeira
+  $('faixaBox').hidden = !(dist && temFaixas(dist));
+  const pres = comp === null ? null : comp / 12;     // média estimada mensal: (média − disponibilidade); cada mês com piso 0
+  const band = $('bandeira').value, fx = temFaixas(dist) ? $('faixa').value : null;
+  const tar = (dist && pres !== null) ? tarifaAXS(dist, band, fx) : null;
+  const mens = tar === null ? null : Math.round(pres * tar * 100 + 1e-9) / 100;   // arredonda ao centavo (meio centavo sobe)
+  $('presMes').textContent = pres === null ? '–' : fmt(pres);
+  $('tarifaVal').textContent = tar === null ? '–' : tar.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5});
+  $('mensal').textContent = mens === null ? '–' : mens.toLocaleString('pt-BR',{style:'currency', currency:'BRL'});
+  $('mensNota').hidden = mens === null;
+  $('mensNota').textContent = mens === null ? '' : dist + (fx ? ' · ' + fx : '') + ', bandeira ' + band + ': ' + fmt(pres) + ' kWh × R$ ' + tar.toLocaleString('pt-BR',{minimumFractionDigits:5, maximumFractionDigits:5}) + '/kWh = ' + mens.toLocaleString('pt-BR',{style:'currency', currency:'BRL'}) + '. Estimativa: a mensalidade real depende da bandeira do mês.';
   // mostra no resultado apenas as linhas com informação aplicada
   // (média informada só aparece quando há ajustes; sem ajustes seria igual à média considerada)
   $('media').parentElement.hidden = !(extra>0 || outros>0 || ger>0 || social) && media!==null && minimo!==null;
   $('relogio').parentElement.hidden = !tipo;
-  [['acExtra',extra>0],['outrosExtra',outros>0],['gerExtra',ger>0],['desc',!!social],['carteira',saldo!==null],['carteiraPrev',prev!=='–']]
+  [['acExtra',extra>0],['outrosExtra',outros>0],['gerExtra',ger>0],['desc',!!social],['carteira',saldo!==null],['carteiraPrev',prev!=='–'],['consAno',consAno!==null],['dispVal',comp!==null],['compAno',comp!==null],['presMes',pres!==null],['tarifaVal',tar!==null],['mensal',tar!==null]]
     .forEach(([id,on])=>{ $(id).parentElement.hidden = !on; });
 
   const st = $('status');
@@ -131,16 +246,18 @@ function calc(){
   }
 }
 /* Ar-condicionado: consumo extra por aparelho (kWh/mês), editável */
-const AC_DEFAULT = [{btu:9000,kwh:100},{btu:12000,kwh:150},{btu:18000,kwh:250},{btu:20000,kwh:300},{btu:24000,kwh:400}];
-const ACKEY = 'validador-lead-ac-v1';
+const AC_DEFAULT = Array.isArray(P.acs) ? P.acs : [];
 let AC = JSON.parse(JSON.stringify(AC_DEFAULT));
-try{ const sa = localStorage.getItem(ACKEY); const a = sa ? JSON.parse(sa) : null;
-  if(Array.isArray(a) && a.length && a.every(x=>x && Number.isFinite(x.btu) && Number.isFinite(x.kwh) && x.kwh >= 0)) AC = a; }catch(e){}
+try{
+  const sa = localStorage.getItem(ACKEY), o = sa ? JSON.parse(sa) : null, a = o && o.versao === P.versao ? o.acs : null;
+  if(Array.isArray(a) && a.length === AC_DEFAULT.length && a.every((x,i)=>x && x.btu === AC_DEFAULT[i].btu && Number.isFinite(x.kwh) && x.kwh >= 0)) AC = a;
+  else if(sa){ RASCUNHO_DESCARTADO = true; localStorage.removeItem(ACKEY); }
+}catch(e){}
 function renderAC(){
   $('acs').innerHTML = AC.map((a,i)=>
     `<div class="acrow"><span>${a.btu.toLocaleString('pt-BR')} BTUs</span>` +
-    `<input type="number" class="ack" data-i="${i}" min="0" step="1" value="${a.kwh}">` +
-    `<input type="number" class="acq" data-i="${i}" min="0" step="1" placeholder="0"></div>`).join('');
+    `<input type="number" class="ack" data-i="${i}" min="0" step="1" value="${a.kwh}" aria-label="Consumo extra por aparelho de ${a.btu.toLocaleString('pt-BR')} BTUs (kWh por mês)">` +
+    `<input type="number" class="acq" data-i="${i}" min="0" step="1" placeholder="0" aria-label="Quantidade de aparelhos de ${a.btu.toLocaleString('pt-BR')} BTUs"></div>`).join('');
 }
 function acExtra(){
   let t = 0;
@@ -155,31 +272,11 @@ $('acs').addEventListener('input',e=>{
   const i = e.target;
   if(i.classList.contains('ack')){
     const v = parseFloat(i.value);
-    if(!isNaN(v) && v>=0){ AC[i.dataset.i].kwh = v; try{ localStorage.setItem(ACKEY, JSON.stringify(AC)); }catch(err){} }
+    if(!isNaN(v) && v>=0){ AC[i.dataset.i].kwh = v; try{ localStorage.setItem(ACKEY, JSON.stringify({versao:P.versao, acs:AC})); }catch(err){} }
   }
   calc();
 });
 /* Alerta de meses fora do padrão (mínimo de 3 meses informados) */
-function checarVariacao(){
-  const lim = parseFloat($('lim').value), el = $('alerta');
-  const itens = [...document.querySelectorAll('.mes')]
-    .map((inp,i)=>({inp,i,v:inp.value.trim()===''?NaN:Number(inp.value)}))
-    .filter(x=>!isNaN(x.v) && x.v>=0);
-  itens.forEach(x=>x.inp.classList.remove('out'));
-  el.innerHTML = '';
-  if(itens.length<3 || !(lim>0)) return;
-  const m = itens.reduce((a,x)=>a+x.v,0)/itens.length;
-  if(!(m>0)) return;
-  const fora = itens.filter(x=>Math.abs(x.v-m)/m*100 > lim);
-  if(!fora.length) return;
-  fora.forEach(x=>x.inp.classList.add('out'));
-  const li = fora.map(x=>{
-    const pct = Math.round(Math.abs(x.v-m)/m*100), dir = x.v>m ? 'acima' : 'abaixo';
-    return `<li><b>Mês ${String(x.i+1).padStart(2,'0')}</b>: ${fmt(x.v)} kWh (${pct}% ${dir} da média de ${fmt(m)})</li>`;
-  }).join('');
-  el.innerHTML = `<div class="alerta"><b>Atenção: ${fora.length>1?'meses fora do padrão':'mês fora do padrão'}</b><ul>${li}</ul>Confirme com o lead se ${fora.length>1?'esses meses devem':'esse mês deve'} entrar na média. Se não, apague o valor para recalcular.</div>`;
-}
-
 /* Alerta de meses fora do padrão */
 let EXCL = new Set();
 function renderAlertas(outliers, mediaTodos){
@@ -200,7 +297,7 @@ let OUTROS = [];
 function renderOutros(){
   $('outros').innerHTML = OUTROS.length
     ? '<div class="orow ohead"><span>Produto</span><span>kWh/mês</span><span>Qtd</span><span>Total</span><span></span></div>' +
-      OUTROS.map((o,i)=>`<div class="orow"><span>${esc(o.nome)}</span><span>${fmt(o.kwh)}</span><input type="number" class="oq" data-i="${i}" min="1" step="1" value="${o.qtd}"><b>${fmt(o.kwh*o.qtd)}</b><button type="button" class="x" data-del="${i}" title="Remover">×</button></div>`).join('')
+      OUTROS.map((o,i)=>`<div class="orow"><span>${esc(o.nome)}</span><span>${fmt(o.kwh)}</span><input type="number" class="oq" data-i="${i}" aria-label="Quantidade de ${esc(o.nome)}" min="1" step="1" value="${o.qtd}"><b>${fmt(o.kwh*o.qtd)}</b><button type="button" class="x" data-del="${i}" aria-label="Remover ${esc(o.nome)}" title="Remover">×</button></div>`).join('')
     : '<p class="legend">Nenhum produto adicionado.</p>';
 }
 function outrosExtra(){ return OUTROS.reduce((t,o)=>t+o.kwh*o.qtd,0); }
@@ -214,8 +311,9 @@ $('outros').addEventListener('click',e=>{
   OUTROS.splice(parseInt(e.target.dataset.del,10),1); renderOutros(); calc();
 });
 $('oAdd').addEventListener('click',()=>{
-  const nome=$('oNome').value.trim(), kwh=parseFloat($('oKwh').value), qtd=parseInt($('oQtd').value,10)||1;
-  if(!nome || isNaN(kwh) || kwh<0 || qtd<1){ alert('Informe o produto e o consumo mensal (kWh).'); return; }
+  if(OUTROS.length >= 50){ alert('Limite de 50 produtos por simulação.'); return; }
+  const nome=$('oNome').value.trim().slice(0,60), kwh=parseFloat($('oKwh').value), qtd=parseInt($('oQtd').value,10)||1;
+  if(!nome || isNaN(kwh) || kwh<0 || kwh>100000 || qtd<1 || qtd>1000){ alert('Informe o produto (até 60 caracteres), o consumo mensal (0 a 100.000 kWh) e a quantidade (1 a 1.000).'); return; }
   OUTROS.push({nome,kwh,qtd});
   ['oNome','oKwh','oQtd'].forEach(id=>$(id).value='');
   renderOutros(); calc();
@@ -253,7 +351,26 @@ const ROT = Object.keys(MESES);
 const brNum = t => parseFloat(String(t).replace(/\./g,'').replace(',','.'));
 const semAcento = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
+/* Procura um bloco de rótulos de mês seguido dos valores na mesma ordem (ex.: JAN26 DEZ25 ... 161 223 ...).
+   Percorre as palavras uma vez (tempo linear): uma regex aninhada travava a página com textos grandes. */
+function blocoMesesValores(T){
+  const MM = '(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)';
+  const tk = T.replace(new RegExp('\\b'+MM+' (?=\\d{2,4}\\b)','g'),'$1').replace(new RegExp('\\b'+MM+'[\\/\\-.](?=\\d{2,4}\\b)','g'),'$1').split(' ');
+  const reM = new RegExp('^'+MM+'(\\d{2,4})$'), reN = /^\d{1,5}(?:[.,]\d+)?$/;
+  for(let i=0;i<tk.length;){
+    if(!reM.test(tk[i])){ i++; continue; }
+    let j = i; while(j<tk.length && reM.test(tk[j])) j++;
+    const n = j - i;
+    if(n >= 5){
+      let k = j; while(k<tk.length && reN.test(tk[k])) k++;
+      if(k - j >= n) return { rot: tk.slice(i,j).map(x=>x.match(reM)), nums: tk.slice(j,j+n) };
+    }
+    i = j;
+  }
+  return null;
+}
 function analisarFatura(txt){
+  if(txt.length > 400000) txt = txt.slice(0, 400000);   // limite de segurança: texto enorme não trava a página
   const T = semAcento(txt).toUpperCase().replace(/\s+/g,' ');
   const r = {};
   // distribuidora: a que aparece primeiro no texto
@@ -266,36 +383,41 @@ function analisarFatura(txt){
   });
   r.dist = best ? best.d : null;
   // tipo de atendimento
-  const mt = T.match(/(MONO|BI|TRI)FASIC[OA]\b/);
-  r.tipo = mt ? {MONO:'Monofásico',BI:'Bifásico',TRI:'Trifásico'}[mt[1]] : null;
+  const mt = T.match(/(MONO|BI|TRI)FASIC[OA]\b/) || T.match(/\bB[1-4]\s*\/\s*(MONO|BIF|TRI)\b/);   // ex.: "B1 / MONO" (Equatorial)
+  r.tipo = mt ? {MONO:'Monofásico',BI:'Bifásico',BIF:'Bifásico',TRI:'Trifásico'}[mt[1]] : null;
   // histórico de consumo: Mês 01 = mais recente, em ordem decrescente
   const hist = new Map();
   let estrito = false;
   const add = (a,m,v)=>{ if(estrito && /[.,]/.test(v)) return; if(a<100) a+=2000; const k=a*12+m; if(!hist.has(k)) hist.set(k,{rot:ROT[m-1]+'/'+String(a).slice(2),v:brNum(v)}); };
-  const reA = /\b(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*[\/\-.]?\s*(\d{2,4})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
-  const reB = /(?<![\/\d])(0[1-9]|1[0-2])\s*\/\s*(20\d{2})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
+  const reA = /\b(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s{0,2}[\/\-.]?\s{0,2}(\d{2,4})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
+  const reB = /(?<![A-Z\/\d])(0[1-9]|1[0-2])\s*\/\s*(20\d{2})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
   const scan = t=>{ for(const m of t.matchAll(reA)) add(+m[2],MESES[m[1]],m[3]); for(const m of t.matchAll(reB)) add(+m[2],+m[1],m[3]); };
-  semAcento(txt).toUpperCase().split('\n').forEach(scan);
+  semAcento(txt).toUpperCase().split('\n').filter(l=>l.length<=3000).forEach(scan);
   if(hist.size<3){
     // rótulos em bloco seguidos dos valores na mesma ordem (ex.: JAN26 DEZ25 ... 161 223 ...)
     const n0 = hist.size;
-    const mm = T.match(/((?:(?:JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*[\/\-.]?\s*\d{2,4}\s+){5,})((?:\d{1,5}(?:[.,]\d+)?\s+){5,})/);
-    if(mm){
-      const rot = [...mm[1].matchAll(/(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*[\/\-.]?\s*(\d{2,4})/g)];
-      const nums = mm[2].trim().split(/\s+/);
-      if(nums.length>=rot.length) rot.forEach((m,i)=>add(+m[2],MESES[m[1]],nums[i]));
-    }
+    const bl = blocoMesesValores(T);
+    if(bl) bl.rot.forEach((m,k)=>add(+m[2],MESES[m[1]],bl.nums[k]));
     if(hist.size===n0){ estrito = true; scan(T); estrito = false; }
   }
   r.meses = [...hist.entries()].sort((a,b)=>b[0]-a[0]).slice(0,12).map(e=>e[1]);
-  // consumo atual = quantidade do item de consumo na fatura
-  const ic = T.match(/(?:CONSUMO EM KWH|CONSUMO KWH|CONSUMO ATIVO|ENERGIA ELETRICA|ENERGIA ATIVA|CONSUMO)\s+(?:KWH\s+)?(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/);
-  r.atual = ic ? brNum(ic[1]) : null;
-  if(r.atual!=null){
-    if(!r.meses.length) r.meses = [{rot:'atual',v:r.atual}];
-    else if(r.meses[0].v!==r.atual){
-      r.aviso = 'O consumo do item da fatura ('+fmt(r.atual)+' kWh) difere do mês mais recente do histórico ('+fmt(r.meses[0].v)+' kWh). Usei o valor do item no Mês 01.';
-      r.meses[0].v = r.atual;
+  // fatura de alta tensão (grupo A: consumo ponta / fora de ponta): o histórico mensal total não é preenchido
+  r.grupoA = /CONSUMO PONTA|CONSUMO FORA DE PONTA|TARIFA (?:VERDE|AZUL)/.test(T);
+  if(r.grupoA){
+    r.meses = []; r.atual = null;
+    r.aviso = 'Fatura de alta tensão (grupo A, ponta/fora de ponta): o histórico não é preenchido automaticamente. Informe o consumo mensal total.';
+  } else {
+    // consumo atual = quantidade do item de consumo (soma as faixas, ex.: tarifa social "até 80 kWh" + "acima")
+    const reI = /(?:CONSUMO EM KWH|CONSUMO KWH|CONSUMO ATIVO|ENERGIA ELETRICA|ENERGIA ATIVA|CONSUMO)\s+(?:KWH\s+)?(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
+    const itens = [...T.matchAll(reI)].map(m=>brNum(m[1])), soma = itens.reduce((a,b)=>a+b,0);
+    r.atual = !itens.length ? null : (itens.length>1 && (!r.meses.length || soma===r.meses[0].v)) ? soma : itens[0];
+    if(r.atual!=null){
+      if(!r.meses.length){
+        r.meses = [{rot:'atual',v:r.atual}];
+        if(itens.length>1) r.aviso = 'Somei as faixas do item de consumo ('+itens.join(' + ')+'). Confira o valor.';
+      } else if(r.meses[0].v!==r.atual){
+        r.aviso = 'O consumo do item da fatura ('+fmt(r.atual)+' kWh) difere do mês mais recente do histórico ('+fmt(r.meses[0].v)+' kWh). Mantive o histórico; confira o Mês 01.';
+      }
     }
   }
   // geração/injeção e carteira
@@ -352,21 +474,28 @@ function historicoGeometrico(items){
     const c = labels.filter(l=>l.x < n.x-5).map(l=>({l, d:Math.abs(l.y-n.y)})).sort((a,b)=>a.d-b.d)[0];
     if(c && c.d<=win) dono.get(c.l).push(n);
   });
+  // descarta a coluna de "dias de faturamento" (cabeçalho "Nº DIAS" acima da coluna, ou valores todos entre 26 e 35)
+  const cab = items.filter(i=>i.str.trim().length<=16 && /\bDIAS\b/.test(semAcento(i.str).toUpperCase()) && i.transform[5] > ys[0] && i.transform[5] - ys[0] < 60).map(i=>({x:i.transform[4], w:i.width||40}));   // cabeçalho curto, logo acima da lista
+  const cols = [];
+  [...dono.values()].flat().sort((a,b)=>a.x-b.x).forEach(n=>{ const c = cols.find(c=>Math.abs(c.x-n.x)<=12); if(c) c.v.push(n); else cols.push({x:n.x, v:[n]}); });
+  const dias = new Set();
+  cols.forEach(c=>{
+    const doCab = cab.some(h=>c.x >= h.x-15 && c.x <= h.x+h.w+15);
+    const faixa = c.v.length>=4 && c.v.every(n=>{ const v = parseFloat(n.t.replace(',','.')); return Number.isInteger(v) && v>=26 && v<=35; });
+    if(doCab || faixa) c.v.forEach(n=>dias.add(n));
+  });
   return labels.map(l=>{
-    const v = dono.get(l).sort((a,b)=>a.x-b.x)[0];   // 1ª coluna numérica = kWh (as seguintes: dias etc.)
+    const v = dono.get(l).filter(n=>!dias.has(n)).sort((a,b)=>a.x-b.x)[0];   // 1ª coluna numérica restante = kWh
     return v ? 'HISTORICO ' + l.t + ' ' + v.t : null;
   }).filter(Boolean);
 }
-async function lerPdf(file){
-  if(!window.pdfjsLib) throw new Error('Biblioteca de leitura de PDF não carregada. Verifique a conexão com a internet.');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
+/* Monta o texto da fatura a partir dos itens de texto do PDF (uma lista por página). Separado de lerPdf para ser testável. */
+function textoDeItens(paginas){
   let txt = ''; const geo = [];
-  for(let p=1;p<=pdf.numPages;p++){
-    const c = await (await pdf.getPage(p)).getTextContent();
-    geo.push(...historicoGeometrico(c.items));
+  paginas.forEach(items=>{
+    geo.push(...historicoGeometrico(items));
     const rows = [];
-    c.items.forEach(i=>{
+    items.forEach(i=>{
       if(!i.str.trim()) return;
       const y = Math.round(i.transform[5]), x = i.transform[4];
       let row = rows.find(r=>Math.abs(r.y-y)<=2);
@@ -374,8 +503,16 @@ async function lerPdf(file){
       row.it.push({x, t:i.str});
     });
     rows.sort((a,b)=>b.y-a.y).forEach(r=>{ txt += r.it.sort((a,b)=>a.x-b.x).map(i=>i.t).join(' ') + '\n'; });
-  }
+  });
   return (geo.length ? geo.join('\n') + '\n' : '') + txt;
+}
+async function lerPdf(file){
+  if(!window.pdfjsLib) throw new Error('Biblioteca de leitura de PDF não carregada. Verifique a conexão com a internet.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer()}).promise;
+  const paginas = [];
+  for(let p=1;p<=pdf.numPages;p++) paginas.push((await (await pdf.getPage(p)).getTextContent()).items);
+  return textoDeItens(paginas);
 }
 $('fatura').addEventListener('change', async e=>{
   const f = e.target.files[0]; if(!f) return;
@@ -389,8 +526,6 @@ $('fatura').addEventListener('change', async e=>{
 });
 $('reanalisar').addEventListener('click',()=>{ if($('impTexto').value.trim()) aplicarFatura($('impTexto').value); });
 /* os dois campos de limite (resultado e configuração) andam juntos */
-$('lim').addEventListener('input',()=>{ $('limiar').value = $('lim').value; });
-$('limiar').addEventListener('input',()=>{ $('lim').value = $('limiar').value; });
 document.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',calc));
 $('limpar').addEventListener('click',()=>{document.querySelectorAll('.mes,.acq').forEach(i=>i.value='');OUTROS=[];renderOutros();$('gPossui').checked=false;$('gCarteira').checked=false;$('gKwh').value='';$('gSaldo').value='';toggleGeracao();});
 calc();

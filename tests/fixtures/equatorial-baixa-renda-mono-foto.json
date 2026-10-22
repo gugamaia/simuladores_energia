@@ -1,0 +1,13 @@
+{
+ "origem": "Equatorial Goiás - B1 monofásico baixa renda (foto; só o topo da fatura aparece); texto transcrito",
+ "texto": "Equatorial Goiás Distribuidora de Energia S.A.\nA Tarifa Social de Energia Eletrica foi criada pela lei 10.438 de 26 de abril de 2002\nGrupo e Subgrupo de Tensao: B1 / MONO Tensao Nom.: 220 V\nTipo de Tarifa: CONVENCIONAL\nClassificacao: BX BAIXA RENDA / TARIFA SUBSIDIADA\nREF: MÊS/ANO 7/2026 TOTAL A PAGAR R$ 232,52 VENCIMENTO 25/08/2026\nDatas de Leituras 15/06/2026 15/07/2026 30 14/08/2026\nBENEFICIO TARIFARIO 56,45\nCLIENTE CADASTRADO NA TARIFA SOCIAL\n",
+ "esperado": {
+  "origem": "Equatorial Goiás - B1 monofásico baixa renda (foto; só o topo da fatura aparece); texto transcrito",
+  "distribuidora": "EQUATORIAL - GO",
+  "tipo": "Monofásico",
+  "social": true,
+  "atual": null,
+  "meses": [],
+  "nota": "Equatorial informa o tipo como \"B1 / MONO\" (sem a palavra monofásico). O histórico não aparece na foto."
+ }
+}

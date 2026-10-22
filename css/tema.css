@@ -1,0 +1,13 @@
+/* Tema claro/escuro compartilhado pelas páginas. O atributo data-tema="claro|escuro" é definido por js/tema.js */
+:root{
+  --bg:#f3f5f7; --card:#fff; --ink:#14212b; --mute:#5d6b76; --line:#d9e0e5;
+  --acc:#1f4e79; --accbg:#e4effa; --head:#1f4e79; --in:#fff3d1;
+  --ok:#0f7b4f; --okbg:#e2f4ec; --no:#b3261e; --nobg:#fde6e6; --warn:#a85d00; --warnbg:#ffe9cf;
+  color-scheme:light;
+}
+:root[data-tema="escuro"]{
+  --bg:#0f161c; --card:#18222b; --ink:#e8eef2; --mute:#93a2ae; --line:#2b3842;
+  --acc:#6db2f2; --accbg:#173247; --head:#17375a; --in:#3a331c;
+  --ok:#5fd1a0; --okbg:#153429; --no:#ff8f86; --nobg:#3a1c1c; --warn:#ffb95e; --warnbg:#3b2a14;
+  color-scheme:dark;
+}

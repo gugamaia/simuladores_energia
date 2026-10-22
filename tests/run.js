@@ -10,6 +10,8 @@ const num = s => { if (s == null) return NaN; return parseFloat(String(s).replac
 let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
 const section = n => console.log('\n== ' + n);
+const PARAM = (() => { const o = {}; new Function('window', fs.readFileSync(path.join(__dirname, '..', 'parametros.js'), 'utf8'))(o); return o.PARAMETROS; })();
+const KP = 'validador-lead-params-v2', KA = 'validador-lead-ac-v2';
 
 class Loader extends ResourceLoader {
   constructor(over) { super(); this.over = over || {}; }
@@ -17,6 +19,7 @@ class Loader extends ResourceLoader {
     if (url.startsWith('http://localhost/')) {
       const rel = url.slice(17).split(/[?#]/)[0] || 'index.html';
       if (this.over[rel] !== undefined) return Promise.resolve(Buffer.from(this.over[rel]));
+      if (rel.startsWith('js/vendor/')) return Promise.resolve(Buffer.from('/* biblioteca omitida nos testes */'));
       const p = path.join(ROOT, rel);
       return fs.existsSync(p) ? Promise.resolve(fs.readFileSync(p)) : Promise.reject(new Error('404 ' + rel));
     }
@@ -27,7 +30,7 @@ async function open(page, o = {}) {
   const errors = []; const vc = new VirtualConsole();
   vc.on('jsdomError', e => errors.push(String(e.message).split('\n')[0]));
   const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
-  const dom = new JSDOM(html, { url: 'http://localhost/' + page + (o.hash || ''), runScripts: 'dangerously', resources: new Loader(o.over), pretendToBeVisual: true, virtualConsole: vc,
+  const dom = new JSDOM(html, { url: 'http://localhost/' + page + (o.query || '') + (o.hash || ''), runScripts: 'dangerously', resources: new Loader(o.over), pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) { w.confirm = () => true; w.alert = () => { w.__alerts = (w.__alerts || 0) + 1; }; w.scrollTo = () => {}; if (o.beforeParse) o.beforeParse(w); } });
   await new Promise(r => dom.window.addEventListener('load', r)); await sleep(40);
   dom.window.__errors = errors; return dom.window;
@@ -42,12 +45,13 @@ const rows = (el) => [...el.querySelectorAll('.row')].map(r => [r.children[0].te
 /* ======================= A) ESTÁTICO ======================= */
 async function estatico() {
   section('A) Estrutura, arquivos e boas práticas');
-  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js'];
+  const VERNUM = (() => { const o = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(o); return o.VERSAO.numero; })();
+  const files = ['index.html', 'indicacao.html', 'consumo.html', 'config.js', 'README.md', '.gitignore', 'css/index.css', 'css/indicacao.css', 'css/consumo.css', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'extras/cloudflare-worker.js', 'parametros.js', '.github/workflows/testes.yml', 'js/vendor/pdf.min.js', 'js/vendor/pdf.worker.min.js', 'js/vendor/LICENSE-pdfjs.txt', 'tests/package-lock.json', 'tests/extrair-fixture.js', 'versao.js', 'CHANGELOG.md', 'proposta.html', 'css/proposta.css', 'css/tema.css', 'js/proposta.js', 'js/tema.js', 'js/proposta-imagens.js', 'js/vendor/html2canvas.min.js', 'js/vendor/jspdf.umd.min.js', 'fonts/montserrat-latin-wght-normal.woff2'];
   files.forEach(f => ok(fs.existsSync(path.join(ROOT, f)), 'arquivo existe: ' + f));
-  for (const f of ['config.js', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js']) {
+  for (const f of ['config.js', 'versao.js', 'parametros.js', 'js/index.js', 'js/indicacao.js', 'js/consumo.js', 'js/rastreio.js', 'js/tema.js', 'js/proposta.js']) {
     try { new Function(fs.readFileSync(path.join(ROOT, f), 'utf8')); ok(true, ''); } catch (e) { ok(false, 'sintaxe JS ' + f, e.message); }
   }
-  for (const f of ['index.html', 'indicacao.html', 'consumo.html']) {
+  for (const f of ['index.html', 'indicacao.html', 'consumo.html', 'proposta.html']) {
     const html = fs.readFileSync(path.join(ROOT, f), 'utf8');
     const d = new JSDOM(html).window.document;
     ok(d.documentElement.lang === 'pt-BR', f + ': lang="pt-BR"');
@@ -60,8 +64,9 @@ async function estatico() {
     const ids = [...d.querySelectorAll('[id]')].map(e => e.id); const dup = ids.filter((x, i) => ids.indexOf(x) !== i);
     ok(!dup.length, f + ': ids únicos', dup.join(','));
     [...d.querySelectorAll('link[href],script[src]')].forEach(e => {
-      const u = e.getAttribute('href') || e.getAttribute('src');
+      const bruto = e.getAttribute('href') || e.getAttribute('src'), u = bruto.split('?')[0];
       if (/^(https?:)?\/\//.test(u)) return;
+      if (!/^js\/vendor\/|^fonts\//.test(u)) ok(bruto === u + '?v=' + VERNUM, f + ': ' + u + ' com ?v=' + VERNUM + ' (força o navegador a pegar a versão nova)', bruto);
       ok(!u.startsWith('/'), f + ': caminho relativo (GitHub Pages) ' + u);
       ok(fs.existsSync(path.join(ROOT, u)), f + ': recurso existe ' + u);
     });
@@ -76,6 +81,20 @@ async function estatico() {
   const gi = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
   ['.env', '.dev.vars', 'node_modules/', '*.pdf', '*.zip'].forEach(p => ok(gi.split('\n').includes(p), '.gitignore contém ' + p));
   ok(!gi.split('\n').includes('config.js') && !gi.split('\n').includes('css/') && !gi.split('\n').includes('js/'), '.gitignore não exclui arquivos do site');
+  ok(fs.statSync(path.join(ROOT, 'js/vendor/pdf.min.js')).size > 100000 && fs.statSync(path.join(ROOT, 'js/vendor/pdf.worker.min.js')).size > 500000, 'pdf.js local tem tamanho esperado');
+  ok(!/cdnjs\.cloudflare/.test(fs.readFileSync(path.join(ROOT, 'consumo.html'), 'utf8') + fs.readFileSync(path.join(ROOT, 'js/consumo.js'), 'utf8')), 'leitor de PDF não depende de CDN');
+  ok(!/cdnjs|googleapis|gstatic|unpkg|jsdelivr/.test(['proposta.html', 'css/proposta.css', 'js/proposta.js'].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('')), 'proposta não depende de CDN nem de fontes externas');
+  ok(/runs-on|npm ci/.test(fs.readFileSync(path.join(ROOT, '.github/workflows/testes.yml'), 'utf8')), 'workflow de testes presente');
+  ok(typeof PARAM.versao === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(PARAM.atualizadoEm) && PARAM.descontoSocial === 200 && PARAM.acs.length === 5 && PARAM.disponibilidade['Monofásico'] === 30 && PARAM.disponibilidade['Bifásico'] === 50 && PARAM.disponibilidade['Trifásico'] === 100, 'parametros.js: versão, data, desconto social, 5 modelos de AC e disponibilidade 30/50/100');
+  ok(JSON.stringify(Object.keys(PARAM.distribuidoras)) === JSON.stringify(Object.keys(TAB)) && Object.entries(PARAM.distribuidoras).every(([d, t]) => TIPOS.every((k, i) => t[k] === TAB[d][i])), 'parametros.js confere com a tabela do negócio (6 distribuidoras x 3 tipos)');
+  const VER = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(VER);
+  const cl = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8'), mv = cl.match(/^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})/m);
+  ok(/^\d+\.\d+\.\d+$/.test(VER.VERSAO.numero) && /^\d{4}-\d{2}-\d{2}$/.test(VER.VERSAO.data), 'versao.js: número (MAIOR.MENOR.CORREÇÃO) e data válidos');
+  ok(!!mv && mv[1] === VER.VERSAO.numero && mv[2] === VER.VERSAO.data, 'CHANGELOG: versão mais recente confere com versao.js', mv ? mv[1] + ' ' + mv[2] : 'sem entrada');
+  ok(/\[Não lançado\]/.test(cl), 'CHANGELOG: seção "Não lançado" presente');
+  const FX = path.join(ROOT, 'tests/fixtures'); const fxs = fs.readdirSync(FX).filter(n => n.endsWith('.json'));
+  ok(fxs.length >= 7, 'fixtures de faturas reais presentes (' + fxs.length + ')');
+  fxs.forEach(f => { const t = fs.readFileSync(path.join(FX, f), 'utf8'); ok(!/[1-9]\d{7,}/.test(t) && !/\*\*\*/.test(t), 'fixture sem números longos nem CPF mascarado: ' + f); });
   const w = await open('index.html'); ok(typeof w.CONFIG === 'object' && 'goatcounter' in w.CONFIG && 'locationsUrl' in w.CONFIG, 'config.js define CONFIG'); w.close();
 }
 
@@ -95,7 +114,7 @@ async function indicacao() {
   r = run(100, 300, 0, 100); ok(/Crédito não zera/.test(txt(w, 'out')) && num(r[2]['Paga no 1º mês']) === 100, 'desconto 0%: sem crédito');
   r = run(100, 300, 50, 0); ok(num(r[2]['Paga no 1º mês']) === 100, 'crédito 0%: indicador paga cheio');
   r = run(100, 300, 50, 50); ok(num(r[2]['Paga no 1º mês']) === 25, 'crédito 50% do desconto (75): paga 25', JSON.stringify(r[2]));
-  r = run(0.01, 1000); ok(txt(w, 'out').includes('isenta por'), 'fatura mínima 0,01 não quebra');
+  r = run(0.01, 1000); ok(/entre R\$ 1,00 e R\$ 10\.000\.000,00/.test(txt(w, 'out')), 'fatura abaixo de R$ 1,00 é recusada com aviso (não trava)');
   r = run(33.33, 99.99); ok(!/NaN|Infinity/.test(txt(w, 'out')), 'centavos sem NaN/Infinity');
   ['', '0', '-5', 'abc'].forEach(v => { run(100, v); ok(/Preencha/.test(txt(w, 'out')), 'fatura inválida "' + v + '" não calcula'); });
   setv(w, 'fInd', 100); setv(w, 'fInv', 300); setv(w, 'pInv', ''); ok(/Preencha|Informe/.test(txt(w, 'out')), 'percentual vazio não calcula');
@@ -117,6 +136,16 @@ async function indicacao() {
     if (!(Math.abs(paga - esperaPaga) < 0.011 && mesesTxt === meses)) { erros++; if (!amostra) amostra = `fInd=${fInd} fInv=${fInv} ${pInv}%/${pInd}% esperado ${meses}m paga ${esperaPaga} obtido ${mesesTxt}m paga ${paga}`; }
   }
   ok(erros === 0, 'propriedade (400 casos aleatórios): meses de isenção e valor do mês de retorno', erros + ' divergências. ' + amostra);
+  // botão Limpar campos
+  const lb = $(w, 'limpar'); ok(!!lb && lb.type === 'button' && /Limpar campos/.test(lb.textContent) && !lb.closest('.grid'), 'botão "Limpar campos" existe (type=button, fora da grade de campos)');
+  run(150, 400, 60, 80); ok(/isenta|Crédito/.test(txt(w, 'out')), 'antes de limpar há resultado'); lb.click();
+  ok($(w, 'fInd').value === '' && $(w, 'fInv').value === '', 'limpar zera a fatura de quem indica e a do indicado');
+  ok(/Preencha as duas faturas/.test(txt(w, 'out')), 'limpar volta o resultado para a mensagem inicial');
+  ok($(w, 'pInv').value === '60' && $(w, 'pInd').value === '80', 'limpar mantém os percentuais da campanha');
+  ok(w.document.activeElement === $(w, 'fInd'), 'limpar leva o cursor ao primeiro campo');
+  lb.click(); lb.click(); ok(/Preencha as duas faturas/.test(txt(w, 'out')) && !w.__errors.length, 'limpar com campos já vazios não quebra', w.__errors.join('|'));
+  r = run(100, 300, 50, 100); ok(txt(w, 'out').includes('isenta por 1 mês') && num(r[2]['Volta a pagar no mês 2']) === 50, 'depois de limpar, um novo cálculo funciona normalmente');
+  setv(w, 'fInd', 100); setv(w, 'fInv', 300); lb.click(); setv(w, 'fInd', 200); ok(/Preencha/.test(txt(w, 'out')), 'depois de limpar, preencher só uma fatura continua pedindo a outra');
   w.close();
 }
 
@@ -194,8 +223,9 @@ async function consumo() {
 
 /* ======================= D) ALERTAS, PARÂMETROS, SEGURANÇA ======================= */
 async function consumo2() {
-  section('D) Consumo: alertas, parâmetros editáveis, persistência e segurança');
+  section('D) Consumo: alertas, parâmetros (arquivo + ajustes locais), persistência e segurança');
   let w = await open('consumo.html');
+  ok(!$(w, 'lim') && !$(w, 'alerta') && !!$(w, 'alertBox') && w.document.querySelectorAll('[id^=alert],#limiar').length === 3, 'alerta de variação unificado (uma caixa e um campo de limite)');
   base(w); meses(w, [100, 100, 100, 100, 300]);
   ok(!$(w, 'alertBox').hidden && $(w, 'alertList').querySelectorAll('input').length === 1, 'alerta: 1 mês fora do padrão (300 vs média 140)');
   ok(w.document.querySelectorAll('.mes')[4].classList.contains('out'), 'mês fora do padrão destacado');
@@ -204,31 +234,56 @@ async function consumo2() {
   meses(w, [100, 100, 100, 100, 110]); ok($(w, 'alertBox').hidden, 'ao corrigir o valor o alerta some e a exclusão é limpa'); ok(num(txt(w, 'media')) === 102 && txt(w, 'qtd') === '5', 'exclusão não persiste quando o mês deixa de ser outlier', txt(w, 'media'));
   meses(w, [100, 100]); ok($(w, 'alertBox').hidden, 'alerta exige ao menos 3 meses');
   meses(w, [0, 0, 0, 0]); ok($(w, 'alertBox').hidden && !/NaN/.test(txt(w, 'media')), 'média 0 não gera alerta nem NaN');
-  meses(w, [100, 100, 100, 100, 300]); setv(w, 'limiar', 200); ok($(w, 'alertBox').hidden, 'limite de 200% não alerta');
-  setv(w, 'limiar', 30); setv(w, 'lim', 60); ok($(w, 'limiar').value === '60', 'os dois campos de limite ficam sincronizados', 'limiar=' + $(w, 'limiar').value);
-  ok(!(!$(w, 'alertBox').hidden && !w.document.querySelector('#alerta .alerta')) && !(($(w, 'alertBox').hidden) && w.document.querySelector('#alerta .alerta')), 'as duas caixas de alerta concordam entre si');
-  // parâmetros
+  meses(w, [100, 100, 100, 100, 300]); setv(w, 'limiar', 200); ok($(w, 'alertBox').hidden, 'limite de 200% não alerta'); setv(w, 'limiar', 30);
+  // parâmetros vindos do arquivo
+  ok(/versão 2026-10-08/.test(txt(w, 'paramInfo')) && !/ajustes locais/.test(txt(w, 'paramInfo')), 'mostra a versão vigente da tabela, sem ajustes locais');
+  ok(w.document.querySelectorAll('#params tr').length === 6 && $(w, 'dist').options.length === 7, 'tabela carregada de parametros.js (6 distribuidoras)');
+  ok(/Desconta 200 kWh/.test($(w, 'social').closest('label').querySelector('small').textContent), 'texto do desconto social vem do arquivo');
+  // edição local
   base(w, 'CEMIG - MG', 'Monofásico'); meses(w, [150, 150, 150]); ok(status(w) === 'no', 'CEMIG mono 150 < 153: não atende');
   const inp = w.document.querySelector('#params tr[data-d="CEMIG - MG"] input[data-k="Monofásico"]'); inp.value = 140; inp.dispatchEvent(new w.Event('input', { bubbles: true }));
   ok(status(w) === 'ok' && num(txt(w, 'minimo')) === 140, 'editar mínimo muda o veredito na hora');
+  ok(/ajustes locais ainda não publicados/.test(txt(w, 'paramInfo')), 'aviso de ajustes locais não publicados');
   inp.value = ''; inp.dispatchEvent(new w.Event('input', { bubbles: true })); ok(num(txt(w, 'minimo')) === 140, 'valor vazio na tabela não corrompe o mínimo');
-  ok(JSON.parse(w.localStorage.getItem('validador-lead-params-v1'))['CEMIG - MG']['Monofásico'] === 140, 'alteração é salva no navegador');
+  const salvo = JSON.parse(w.localStorage.getItem(KP)); ok(salvo.versao === PARAM.versao && salvo.params['CEMIG - MG']['Monofásico'] === 140, 'ajuste salvo no navegador junto com a versão da tabela');
+  const k0 = w.document.querySelector('.ack'); k0.value = 120; k0.dispatchEvent(new w.Event('input', { bubbles: true })); ok(JSON.parse(w.localStorage.getItem(KA)).acs[0].kwh === 120, 'consumo extra do AC salvo com a versão');
+  // exportar
+  w.URL.createObjectURL = b => { w.__blob = b; return 'blob:teste'; }; w.HTMLAnchorElement.prototype.click = function () { w.__baixou = this.download; };
+  $(w, 'exportar').click(); const conteudo = await new Promise(r => { const fr = new w.FileReader(); fr.onload = () => r(fr.result); fr.readAsText(w.__blob); });
+  const o = {}; new Function('window', conteudo)(o); const E = o.PARAMETROS;
+  ok(w.__baixou === 'parametros.js' && E.distribuidoras['CEMIG - MG']['Monofásico'] === 140 && E.acs[0].kwh === 120 && E.descontoSocial === 200, 'exportar gera parametros.js válido com os ajustes');
+  ok(E.versao !== PARAM.versao && /^\d{2}\/\d{2}\/\d{4}$/.test(E.atualizadoEm), 'exportar gera nova versão e data', E.versao);
+  // cadastro e remoção
   setv(w, 'nNome', 'CELESC - SC'); setv(w, 'nMono', 100); setv(w, 'nBi', 120); setv(w, 'nTri', 160); $(w, 'add').click();
   ok([...$(w, 'dist').options].some(o => o.value === 'CELESC - SC'), 'nova distribuidora aparece na lista'); setv(w, 'dist', 'CELESC - SC'); setv(w, 'tipo', 'Trifásico'); ok(num(txt(w, 'minimo')) === 160, 'nova distribuidora funciona (mínimo 160)');
   const a = w.__alerts || 0; setv(w, 'nNome', ''); $(w, 'add').click(); ok((w.__alerts || 0) === a + 1, 'cadastro sem nome é recusado');
   w.document.querySelector('#params tr[data-d="CELESC - SC"] [data-del]').click(); ok(![...$(w, 'dist').options].some(o => o.value === 'CELESC - SC') && $(w, 'dist').value === '', 'remover distribuidora selecionada limpa a seleção'); ok(/FALTA CONFIGURAR/.test(txt(w, 'status')), 'sem distribuidora volta a "falta configurar"');
-  $(w, 'restaurar').click(); ok(w.eval('PARAMS["CEMIG - MG"]["Monofásico"]') === 153, 'restaurar volta aos valores originais');
+  $(w, 'restaurar').click(); ok(w.eval('PARAMS["CEMIG - MG"]["Monofásico"]') === 153 && w.document.querySelector('.ack').value === '100', 'restaurar volta à tabela vigente (parâmetros e consumo dos AC)');
+  ok(!/ajustes locais/.test(txt(w, 'paramInfo')) && !w.localStorage.getItem(KA), 'após restaurar não há ajustes locais'); w.close();
   // persistência entre aberturas
-  w.close(); w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', JSON.stringify({ 'XPTO - ZZ': { 'Monofásico': 111, 'Bifásico': 222, 'Trifásico': 333 } })); } });
-  ok([...$(w, 'dist').options].some(o => o.value === 'XPTO - ZZ'), 'parâmetros salvos são carregados na abertura'); w.close();
-  // dados corrompidos no localStorage
-  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', '{quebrado'); x.localStorage.setItem('validador-lead-ac-v1', '{quebrado'); } });
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: { 'XPTO - ZZ': { 'Monofásico': 111, 'Bifásico': 222, 'Trifásico': 333 } } })); } });
+  ok([...$(w, 'dist').options].some(o => o.value === 'XPTO - ZZ') && /ajustes locais/.test(txt(w, 'paramInfo')), 'ajustes locais da mesma versão são carregados'); w.close();
+  // tabela atualizada no repositório: rascunho antigo é descartado com aviso
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, JSON.stringify({ versao: 'antiga', params: { 'XPTO - ZZ': { 'Monofásico': 1, 'Bifásico': 2, 'Trifásico': 3 } } })); x.localStorage.setItem(KA, JSON.stringify({ versao: 'antiga', acs: PARAM.acs })); } });
+  ok(![...$(w, 'dist').options].some(o => o.value === 'XPTO - ZZ') && /descartados/.test(txt(w, 'paramInfo')) && !w.localStorage.getItem(KP), 'versão nova da tabela descarta ajustes locais antigos e avisa'); w.close();
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', JSON.stringify({ 'XPTO - ZZ': { 'Monofásico': 1, 'Bifásico': 2, 'Trifásico': 3 } })); } });
+  ok(!w.__errors.length && /descartados/.test(txt(w, 'paramInfo')) && $(w, 'dist').options.length === 7, 'formato legado (v1) é descartado com aviso'); w.close();
+  // tabela publicada diferente (simula uma nova versão no repositório)
+  const novo = "window.PARAMETROS=" + JSON.stringify({ ...PARAM, versao: '2099-01-01', atualizadoEm: '01/01/2099', descontoSocial: 300, acs: PARAM.acs.map((x, i) => i === 0 ? { ...x, kwh: 111 } : x), distribuidoras: { ...PARAM.distribuidoras, 'COPEL - PR': { 'Monofásico': 1, 'Bifásico': 2, 'Trifásico': 3 } } }) + ";";
+  w = await open('consumo.html', { over: { 'parametros.js': novo } });
+  ok(/versão 2099-01-01/.test(txt(w, 'paramInfo')) && w.eval('PARAMS["COPEL - PR"]["Bifásico"]') === 2, 'nova versão do arquivo é usada pelo simulador');
+  ok(w.document.querySelector('.ack').value === '111', 'consumo extra do AC vem do arquivo'); ok(/Desconta 300 kWh/.test($(w, 'social').closest('label').querySelector('small').textContent), 'desconto social configurável pelo arquivo (texto)');
+  base(w); meses(w, [500, 500, 500]); chk(w, 'social', true); ok(num(txt(w, 'considerada')) === 200, 'desconto social configurável pelo arquivo (cálculo: 500 - 300)', txt(w, 'considerada')); w.close();
+  // arquivo de parâmetros ausente
+  w = await open('consumo.html', { over: { 'parametros.js': '' } });
+  ok(!w.__errors.length && /não foi carregado/.test(txt(w, 'paramInfo')), 'sem parametros.js: avisa e não quebra', w.__errors.join('|')); w.close();
+  // dados corrompidos
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, '{quebrado'); x.localStorage.setItem(KA, '{quebrado'); } });
   ok(!w.__errors.length && $(w, 'dist').options.length === 7, 'JSON inválido no armazenamento: usa os padrões e não quebra', w.__errors.join('|')); w.close();
-  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-ac-v1', '[1,null]'); } });
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KA, JSON.stringify({ versao: PARAM.versao, acs: [1, null] })); } });
   ok(!w.__errors.length && w.document.querySelectorAll('.acq').length === 5, 'AC salvo com formato errado não derruba a página', w.__errors.join('|')); w.close();
-  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem('validador-lead-params-v1', JSON.stringify({ 'A - B': {} })); } });
-  base(w, 'A - B', 'Bifásico'); meses(w, [300, 300, 300]); ok(!/NaN|undefined/.test(txt(w, 'considerada') + txt(w, 'minimo') + txt(w, 'dif')), 'parâmetro incompleto no armazenamento não gera NaN', txt(w, 'considerada') + '/' + txt(w, 'minimo')); w.close();
-  // sem localStorage (ex.: arquivo aberto direto, navegação privada)
+  w = await open('consumo.html', { beforeParse(x) { x.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: { 'A - B': {} } })); } });
+  base(w, 'A - B', 'Bifásico'); meses(w, [300, 300, 300]); ok(!/NaN|undefined/.test(txt(w, 'considerada') + txt(w, 'minimo') + txt(w, 'dif')), 'parâmetro incompleto no armazenamento não gera NaN'); w.close();
   w = await open('consumo.html', { beforeParse(x) { Object.defineProperty(x, 'localStorage', { get() { throw new Error('SecurityError'); } }); } });
   ok(!w.__errors.length, 'sem acesso ao localStorage a página funciona', w.__errors.join('|')); w.close();
   // XSS
@@ -276,29 +331,437 @@ async function fatura() {
   w.close();
 }
 
+/* ======================= H) FATURAS REAIS (fixtures anonimizadas) ======================= */
+async function faturasReais() {
+  section('H) Faturas reais (fixtures anonimizadas: PDFs com texto, escaneado e transcrições de fotos)');
+  const dir = path.join(__dirname, 'fixtures'); const w = await open('consumo.html');
+  const itensDe = pgs => pgs.map(a => a.map(([str, x, y, wd]) => ({ str, transform: [1, 0, 0, 1, x, y], width: wd })));
+  const par = r => JSON.stringify(r.meses.map(m => [m.rot, m.v]));
+  for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.json')).sort()) {
+    const fx = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')), e = fx.esperado, id = f.replace('.json', '');
+    const texto = fx.paginas ? w.textoDeItens(itensDe(fx.paginas)) : fx.texto, r = w.analisarFatura(texto);
+    ok(r.dist === e.distribuidora, id + ': distribuidora ' + e.distribuidora, r.dist);
+    ok((r.tipo || null) === e.tipo, id + ': tipo ' + e.tipo, r.tipo);
+    ok(!!r.social === !!e.social, id + ': tarifa social ' + (e.social ? 'detectada' : 'não detectada'));
+    ok((r.atual == null ? null : r.atual) === e.atual, id + ': consumo atual ' + e.atual, r.atual);
+    ok(par(r) === JSON.stringify(e.meses), id + ': histórico (' + e.meses.length + ' meses, Mês 01 = mais recente)', par(r));
+    ok(!!r.grupoA === !!e.grupoA, id + ': grupo A (alta tensão) ' + (e.grupoA ? 'detectado' : 'não'));
+    if (e.avisoContem) ok(new RegExp(e.avisoContem, 'i').test(r.aviso || ''), id + ': aviso "' + e.avisoContem + '"', r.aviso);
+    // aplicação na tela e resultado final
+    base(w); w.aplicarFatura(texto);
+    ok(!$(w, 'social').checked, id + ': tarifa social só avisa (não marca sozinha)');
+    if (e.meses.length) {
+      ok($(w, 'm1').value === String(e.meses[0][1]) && w.document.querySelector('label[for=m1]').textContent === 'Mês 01 (' + e.meses[0][0] + ')', id + ': Mês 01 e rótulo na tela');
+      ok(e.meses.every((m, i) => $(w, 'm' + (i + 1)).value === String(m[1])) && (e.meses.length >= 12 || $(w, 'm' + (e.meses.length + 1)).value === ''), id + ': todos os meses preenchidos e o restante vazio');
+      const media = e.meses.reduce((a, m) => a + m[1], 0) / e.meses.length; ok(Math.abs(num(txt(w, 'considerada')) - media) < 0.011, id + ': média considerada ' + media.toFixed(2), txt(w, 'considerada'));
+      if (e.distribuidora && e.tipo) { const min = TAB[e.distribuidora][TIPOS.indexOf(e.tipo)]; ok(status(w) === (media >= min ? 'ok' : 'no') && num(txt(w, 'minimo')) === min, id + ': veredito contra o mínimo ' + min); }
+    } else ok($(w, 'm1').value === '' && /histórico não encontrado/.test(txt(w, 'impStatus')), id + ': sem histórico: campos vazios e aviso na tela');
+  }
+  // fluxo completo do botão de PDF (pdf.js simulado com os itens reais anonimizados)
+  const stub = (x, pgs) => { x.pdfjsLib = { GlobalWorkerOptions: {}, getDocument: () => ({ promise: Promise.resolve({ numPages: pgs.length, getPage: async n => ({ getTextContent: async () => ({ items: pgs[n - 1] }) }) }) }) }; };
+  const enviar = async x => { const i = $(x, 'fatura'); Object.defineProperty(i, 'files', { value: [{ arrayBuffer: async () => new ArrayBuffer(1) }], configurable: true }); i.dispatchEvent(new x.Event('change', { bubbles: true })); await sleep(200); };
+  const fxPdf = JSON.parse(fs.readFileSync(path.join(dir, 'copel-baixa-renda-mono.json'), 'utf8'));
+  base(w); stub(w, itensDe(fxPdf.paginas)); await enviar(w);
+  ok($(w, 'dist').value === 'COPEL - PR' && $(w, 'tipo').value === 'Monofásico' && $(w, 'm1').value === '332' && $(w, 'm12').value === '343', 'botão de PDF: lê a Copel baixa renda de ponta a ponta');
+  ok(/tarifa social/i.test(txt(w, 'impStatus')) && !$(w, 'social').checked, 'botão de PDF: avisa da tarifa social sem marcar');
+  base(w); stub(w, [[], []]); await enviar(w); ok(/Não encontrei texto no PDF/.test(txt(w, 'impStatus')) && $(w, 'm1').value === '', 'PDF escaneado (CPFL): mensagem clara e nada é preenchido');
+  base(w); delete w.pdfjsLib; await enviar(w); ok(/Não consegui ler a fatura/.test(txt(w, 'impStatus')), 'biblioteca de PDF indisponível: mensagem de erro');
+  w.close();
+}
+/* ======================= I) TEMA CLARO/ESCURO ======================= */
+async function tema() {
+  section('I) Tema claro/escuro');
+  const T = w => w.document.documentElement.getAttribute('data-tema');
+  const mm = escuro => x => { x.matchMedia = q => ({ matches: escuro && /dark/.test(q), media: q, addEventListener() {}, removeEventListener() {} }); };
+  let w = await open('index.html'); ok(T(w) === 'claro', 'sem preferência do sistema: tema claro'); w.close();
+  w = await open('index.html', { beforeParse: mm(true) }); ok(T(w) === 'escuro' && $(w, 'tema').checked, 'sistema em modo escuro: tema escuro e chave ligada'); w.close();
+  w = await open('index.html', { beforeParse(x) { mm(true)(x); x.localStorage.setItem('simuladores-tema', 'claro'); } }); ok(T(w) === 'claro', 'escolha salva vence a preferência do sistema'); w.close();
+  w = await open('index.html', { beforeParse(x) { mm(true)(x); x.localStorage.setItem('simuladores-tema', 'xyz'); } }); ok(T(w) === 'escuro', 'valor salvo inválido é ignorado'); w.close();
+  w = await open('index.html', { beforeParse(x) { Object.defineProperty(x, 'localStorage', { get() { throw new Error('SecurityError'); } }); } }); ok(!w.__errors.length && T(w) === 'claro', 'sem localStorage o tema funciona', w.__errors.join('|')); w.close();
+  w = await open('index.html', { beforeParse: mm(false) });
+  const b = $(w, 'tema');
+  ok(b.type === 'checkbox' && b.getAttribute('role') === 'switch' && !b.checked && /tema escuro/i.test(b.getAttribute('aria-label')), 'tema é uma chave (switch) acessível, desligada no tema claro');
+  ok(/Claro/.test(w.document.querySelector('.lado-claro').textContent) && /Escuro/.test(w.document.querySelector('.lado-escuro').textContent), 'chave mostra as opções Claro e Escuro');
+  b.click(); ok(T(w) === 'escuro' && b.checked, 'ligar a chave muda para o tema escuro');
+  ok(w.localStorage.getItem('simuladores-tema') === 'escuro', 'a escolha é salva no navegador');
+  b.click(); ok(T(w) === 'claro', 'desligar a chave volta ao tema claro'); b.click();
+  w.document.querySelector('#nav a[data-k=consumo]').click(); await sleep(900); const f = $(w, 'frame').contentWindow;
+  ok(T(f) === 'escuro', 'simulador aberto recebe o tema escuro do menu', T(f));
+  b.click(); await sleep(250); ok(T(f) === 'claro', 'alternar no menu muda o tema do simulador aberto');
+  w.document.querySelector('#nav a[data-k=proposta]').click(); await sleep(900); ok(T($(w, 'frame').contentWindow) === 'claro', 'a aba de proposta também segue o tema'); w.close();
+  for (const pg of ['index', 'indicacao', 'consumo', 'proposta']) {
+    const h = fs.readFileSync(path.join(ROOT, pg + '.html'), 'utf8'), c = fs.readFileSync(path.join(ROOT, 'css', pg + '.css'), 'utf8');
+    ok(/css\/tema\.css/.test(h) && /js\/tema\.js/.test(h), pg + ': usa tema.css e tema.js'); ok(!/--bg\s*:/.test(c), pg + ': o css da página não redefine a paleta (vem de tema.css)');
+  }
+  const tc = fs.readFileSync(path.join(ROOT, 'css/tema.css'), 'utf8'), vars = t => [...t.matchAll(/(--[a-z]+):/g)].map(m => m[1]).sort().join(',');
+  const partes = tc.split(':root[data-tema="escuro"]'); ok(partes.length === 2 && vars(partes[0]) === vars(partes[1]) && vars(partes[0]).split(',').length >= 14, 'tema.css: claro e escuro definem exatamente as mesmas variáveis (' + vars(partes[0]).split(',').length + ')');
+}
+
+/* ======================= J) PROPOSTA DE OFERTA ======================= */
+async function proposta() {
+  section('J) Proposta de oferta (formulário, prévia, PDF e JPG)');
+  const w = await open('proposta.html'); ok(!w.__errors.length, 'carrega sem erros', w.__errors.join('|'));
+  const v = id => txt(w, id), d0 = new Date(), hojeISO = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
+  ok($(w, 'pData').value === hojeISO, 'data da proposta começa com a data de hoje');
+  ok($(w, 'pObs').value.startsWith('Sim, você receberá duas faturas') && $(w, 'pCargo').value === 'Consultora AXS Energia' && v('vB1') === '🌱 Energia Sustentável' && v('vB3') === '🔒 Sem fidelidade', 'textos padrão do modelo AXS');
+  ok(v('vCliente') === '' && v('vConsumo') === '' && v('vMensalidade') === '' && v('vEconomia') === '', 'valores em branco ficam vazios na prévia');
+  ok($(w, 'imgLogo').src.startsWith('data:image/png') && $(w, 'imgBanner').src.startsWith('data:image/jpeg'), 'logo e banner da AXS embutidos');
+  setv(w, 'pConsultor', '  Maria Souza '); setv(w, 'pCliente', 'João Silva'); setv(w, 'pUC', '123-4'); setv(w, 'pConsumo', 450); setv(w, 'pMensalidade', 389.9); setv(w, 'pEconomia', 1250); setv(w, 'pData', '2026-10-05');
+  ok(v('vConsultor') === 'Maria Souza' && v('vAssinatura') === 'Maria Souza', 'consultor na prévia e na assinatura (sem espaços sobrando)');
+  ok(v('vCliente') === 'João Silva' && v('vUC') === '123-4' && v('vData') === '05/10/2026', 'cliente, UC e data (dd/mm/aaaa)');
+  ok(v('vConsumo') === '450 kWh/mês' && /R\$\s?389,90/.test(v('vMensalidade')) && /R\$\s?1\.250,00/.test(v('vEconomia')), 'formatação de kWh e reais', v('vMensalidade') + ' | ' + v('vEconomia'));
+  setv(w, 'pConsumo', -5); setv(w, 'pMensalidade', 'abc'); ok(v('vConsumo') === '' && v('vMensalidade') === '', 'valor negativo ou inválido não aparece');
+  setv(w, 'pConsumo', 1234.5); ok(v('vConsumo') === '1.234,5 kWh/mês', 'consumo com milhar e decimal', v('vConsumo'));
+  setv(w, 'pObs', 'Linha 1\n\nLinha 2'); ok($(w, 'vObs').textContent === 'Linha 1\n\nLinha 2', 'observação mantém as quebras de linha');
+  setv(w, 'pB2', ''); ok(v('vB2') === '' && v('vB1') !== '', 'benefício em branco fica vazio (e é ocultado pelo css)');
+  const rapida = n => { $(w, 'pValidadeRapida').value = n; $(w, 'pValidadeRapida').dispatchEvent(new w.Event('change', { bubbles: true })); };
+  rapida('15'); ok($(w, 'pValidade').value === '20/10/2026' && v('vValidade') === '20/10/2026', 'validade rápida: 15 dias após 05/10/2026');
+  setv(w, 'pData', '2026-12-25'); rapida('7'); ok($(w, 'pValidade').value === '01/01/2027', 'validade rápida atravessa o fim do ano');
+  $(w, 'limpar').click();
+  ok($(w, 'pCliente').value === '' && $(w, 'pConsumo').value === '' && $(w, 'pValidade').value === '' && $(w, 'pUC').value === '' && v('vCliente') === '', 'limpar zera cliente, UC, validade e valores');
+  ok($(w, 'pConsultor').value.trim() === 'Maria Souza' && $(w, 'pObs').value.startsWith('Sim, você') && $(w, 'pData').value === hojeISO && v('vB2') === '✅ Sem taxa de adesão', 'limpar mantém o consultor e restaura textos, benefícios e data de hoje');
+  ok(JSON.parse(w.localStorage.getItem('simuladores-proposta-consultor')).nome === 'Maria Souza', 'consultor fica salvo neste navegador');
+  const capt = []; w.html2canvas = async (el, o) => { capt.push({ o, largura: el.style.width, id: el.id }); return { width: 2000, height: 3000, toDataURL: (t, q) => 'data:' + t + ';base64,AAA' + (q || '') }; };
+  const pdfs = []; w.jspdf = { jsPDF: class { constructor(o) { this.o = o; this.calls = []; pdfs.push(this); } addImage(...a) { this.calls.push(a); } save(n) { this.nome = n; } } };
+  const baixados = []; w.HTMLAnchorElement.prototype.click = function () { baixados.push({ nome: this.download, href: this.href }); };
+  setv(w, 'pCliente', 'João da Silva & Cia Ltda.'); setv(w, 'pConsumo', 300);
+  $(w, 'pdf').click(); await sleep(150);
+  ok(pdfs.length === 1 && pdfs[0].nome === 'proposta_axs_joao-da-silva-cia-ltda.pdf', 'PDF: nome do arquivo com o cliente (sem acentos/símbolos)', pdfs[0] && pdfs[0].nome);
+  ok(pdfs[0].o.format[0] === 210 && Math.abs(pdfs[0].o.format[1] - 315) < 0.01 && pdfs[0].calls[0][1] === 'JPEG', 'PDF: largura A4 (210 mm), altura proporcional ao conteúdo e imagem JPEG (arquivo leve)');
+  ok(capt[0].largura === '1000px' && capt[0].id === '' && capt[0].o.scale === 2, 'exportação usa cópia da folha com 1000px, sem ids repetidos, escala 2');
+  ok(!w.document.querySelector('.palco-export') && !$(w, 'pdf').disabled, 'cópia temporária removida e botões liberados');
+  $(w, 'jpg').click(); await sleep(150);
+  ok(baixados.length === 1 && baixados[0].nome === 'proposta_axs_joao-da-silva-cia-ltda.jpg' && /^data:image\/jpeg/.test(baixados[0].href), 'JPG: nome do arquivo e dados da imagem'); ok(/JPG gerado/.test(txt(w, 'msg')), 'mensagem de sucesso');
+  setv(w, 'pCliente', ''); $(w, 'jpg').click(); await sleep(150); ok(baixados[1].nome === 'proposta_axs.jpg', 'sem cliente: nome padrão proposta_axs');
+  w.html2canvas = async () => { throw new Error('falhou'); }; $(w, 'pdf').click(); await sleep(150); ok(/Não foi possível gerar/.test(txt(w, 'msg')) && !$(w, 'pdf').disabled, 'falha na geração: mensagem e botões liberados');
+  delete w.html2canvas; $(w, 'jpg').click(); await sleep(150); ok(/não carregada/.test(txt(w, 'msg')), 'biblioteca ausente: mensagem clara');
+  w.close();
+  // aviso ao menu (contagem de propostas)
+  const h = await open('index.html', { hash: '#proposta' }); const msgs = []; h.postMessage = m => msgs.push(m); await sleep(800);
+  const c = $(h, 'frame').contentWindow; c.html2canvas = async () => ({ width: 10, height: 10, toDataURL: () => 'data:image/png;base64,AA' }); c.jspdf = { jsPDF: class { addImage() {} save() {} } };
+  c.document.getElementById('pdf').click(); await sleep(250); ok(msgs.some(m => m.tipo === 'proposta' && m.formato === 'pdf'), 'proposta gerada dentro do menu avisa o menu'); h.close();
+  const solo = await open('proposta.html'); const m2 = []; solo.postMessage = m => m2.push(m); solo.html2canvas = async () => ({ width: 10, height: 10, toDataURL: () => 'data:image/png;base64,AA' }); solo.jspdf = { jsPDF: class { addImage() {} save() {} } };
+  solo.document.getElementById('pdf').click(); await sleep(250); ok(!m2.length, 'fora do menu nenhuma mensagem é enviada'); solo.close();
+  const css = fs.readFileSync(path.join(ROOT, 'css/proposta.css'), 'utf8'), ms = css.match(/\.px-signature-name\{[^}]*min-height:(\d+)px/);
+  ok(!!ms && +ms[1] >= 48, 'assinatura: espaço reservado de pelo menos 48 px para o nome do consultor', ms ? ms[1] + 'px' : 'sem regra');
+  const sg = (await open('proposta.html')); const ass = sg.document.querySelector('.px-signature'); ok([...ass.children].map(e => e.id || 'texto').join() === 'texto,vAssinatura,vCargo' && sg.document.getElementById('vAssinatura').textContent === '', 'assinatura: "Atenciosamente", espaço do nome (vazio) e cargo, nessa ordem'); sg.close();
+  const base = path.join(ROOT, 'js/proposta-imagens.js'), im = fs.readFileSync(base, 'utf8'); ok(/logo: "data:image\/png;base64,/.test(im) && /banner: "data:image\/jpeg;base64,/.test(im) && fs.statSync(base).size < 600000, 'imagens embutidas e leves (banner em JPEG)');
+}
+
+/* ======================= K) LAYOUT (imagem de referência) ======================= */
+async function layoutConsumo() {
+  section('K) Layout: 3 colunas do simulador de consumo e padrão das demais telas');
+  const w = await open('consumo.html'), d = w.document;
+  ok([...d.querySelectorAll('.layout > section')].map(x => x.className).join() === 'col-a,col-b,col-c', 'três colunas: col-a, col-b e col-c');
+  const tit = c => [...d.querySelectorAll('.' + c + ' > .card')].map(x => x.querySelector('summary,h2').textContent.replace(/\s+/g, ' ').trim());
+  ok(tit('col-a').map(t => t.slice(0, 12)).join('|') === 'Importar fat|Ar-condicion|Outros produ|Cliente poss', 'coluna 1: importar fatura, ar-condicionado, outros produtos e geração/injeção', tit('col-a').join('|'));
+  ok(tit('col-b')[0] === 'Dados do lead' && !!d.querySelector('.col-b #months') && !!d.querySelector('.col-b #limpar') && !!d.querySelector('.col-b #dist'), 'coluna 2: dados do lead (distribuidora, tipo, meses e botão limpar)');
+  ok(tit('col-c')[0] === 'Resultado' && /Parâmetros de atendimento/.test(tit('col-c')[1]) && !!d.querySelector('.col-c #status') && !!d.querySelector('.col-c #limiar'), 'coluna 3: resultado (com o limite de alerta) e parâmetros');
+  const aberto = c => [...d.querySelectorAll('.' + c + ' > .card > details')].map(x => x.open ? 1 : 0).join('');
+  ok(aberto('col-a') === '1001' && aberto('col-c') === '0', 'abertura inicial como na imagem: importar e geração abertos; AC, produtos e parâmetros recolhidos', aberto('col-a') + '/' + aberto('col-c'));
+  ok(!!d.querySelector('header h1') && /Validador de lead/.test(d.querySelector('header h1').textContent) && !!d.querySelector('.hint'), 'faixa de título e texto de apoio no topo');
+  const css = fs.readFileSync(path.join(ROOT, 'css/consumo.css'), 'utf8');
+  ok(/repeat\(3,minmax\(0,370px\)\)/.test(css) && /max-width:1400px/.test(css) && /justify-content:space-between/.test(css), 'css: grade de 3 colunas de 370px em container de até 1400px');
+  ok(/@media\(max-width:1180px\)/.test(css) && /@media\(max-width:720px\)/.test(css), 'css: 2 colunas em telas médias e 1 coluna no celular');
+  const ci = fs.readFileSync(path.join(ROOT, 'css/index.css'), 'utf8'); ok(/grid-template-columns:1fr auto 1fr/.test(ci) && /\.nav-links\{display:flex;gap:4px;justify-content:center\}/.test(ci), 'menu: links centralizados, tema e versão à direita');
+  for (const pg of ['indicacao', 'proposta']) { const x = await open(pg + '.html'); ok(!!x.document.querySelector('header h1') && !!x.document.querySelector('.hint'), pg + ': faixa de título e texto de apoio como nas demais telas'); x.close(); }
+  w.close();
+}
+
+/* ======================= L) ENERGIA COMPARTILHADA ESTIMADA NO ANO ======================= */
+async function energiaCompartilhada() {
+  section('L) Energia compartilhada estimada no ano (desconto de disponibilidade: mono 30, bi 50, tri 100 kWh/mês)');
+  const w = await open('consumo.html'), q = id => num(txt(w, id));
+  const qac = (i, n) => { const e = w.document.querySelectorAll('.acq')[i]; e.value = n; e.dispatchEvent(new w.Event('input', { bubbles: true })); };
+  ok($(w, 'dispMono').value === '30' && $(w, 'dispBi').value === '50' && $(w, 'dispTri').value === '100', 'campos de disponibilidade vêm do arquivo de parâmetros (30 / 50 / 100)');
+  // monofásico
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [100, 100, 100]);
+  ok(q('dispVal') === 30 && q('compAno') === 840, 'mono: (100 - 30) x 12 = 840 kWh de energia compartilhada no ano', txt(w, 'compAno'));
+  ok(q('consAno') === 1200, 'consumo anual estimado = média x 12, sem subtração (1.200)', txt(w, 'consAno'));
+  ok(q('media') === 100 && q('considerada') === 100, 'a média estimada mantém os valores sem subtração (100)');
+  ok(/Projeção para 12 meses a partir de 3 meses informados/.test(txt(w, 'compNota')) && /\(média 100,00 − disponibilidade 30,00\) × 12 = 840,00 kWh/.test(txt(w, 'compNota')) && /não tem essa subtração/.test(txt(w, 'compNota')), 'nota mostra a fórmula (média − disponibilidade) × 12 e a projeção', txt(w, 'compNota'));
+  meses(w, [100]); ok(/a partir de 1 mês informado/.test(txt(w, 'compNota')), 'nota no singular com 1 mês');
+  // bifásico: mês abaixo da disponibilidade vale 0
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [100, 40]);
+  ok(q('dispVal') === 50 && q('compAno') === 300, 'bi: meses abaixo da disponibilidade valem 0: (50 + 0) / 2 x 12 = 300', txt(w, 'compAno'));
+  ok(/cada mês − 50,00 kWh de disponibilidade, mínimo 0, projetado para 12 meses = 300,00 kWh/.test(txt(w, 'compNota')), 'nota explica o piso em 0 quando algum mês fica abaixo da disponibilidade', txt(w, 'compNota'));
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [500, 500, 500, 500]);
+  ok(q('media') === 500 && q('consAno') === 6000 && q('dispVal') === 50 && q('compAno') === 5400 && /\(média 500,00 − disponibilidade 50,00\) × 12 = 5\.400,00 kWh/.test(txt(w, 'compNota')), 'exemplo da tela: média 500 x 12 = 6.000 sem subtração; (500 - 50) x 12 = 5.400 com subtração');
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [100, 40]);
+  ok(q('media') === 70 && q('consAno') === 840, 'bi: média (70) e consumo anual (840) sem subtração');
+  // trifásico com 12 meses: soma real, sem projeção
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, Array(12).fill(150));
+  ok(q('compAno') === 600 && q('dispVal') === 100 && !/Projeção/.test(txt(w, 'compNota')), 'tri com 12 meses: (150 - 100) x 12 = 600, sem projeção', txt(w, 'compAno'));
+  meses(w, [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200]); ok(q('compAno') === 6600 && q('consAno') === 7800, 'tri com 12 meses variados: soma dos (mês - 100) = 6.600', txt(w, 'compAno'));
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [20, 10]); ok(q('compAno') === 0 && vis(w, 'compAno'), 'todos os meses abaixo da disponibilidade: 0 kWh (e a linha continua visível)');
+  // extras e tarifa social
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [200]); qac(1, 1);
+  ok(q('compAno') === 3000 && q('consAno') === 4200 && q('considerada') === 350, 'com AC 12.000 BTUs (+150): (200 + 150 - 100) x 12 = 3.000; consumo anual 4.200', txt(w, 'compAno'));
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [300, 300, 300]); chk(w, 'social', true);
+  ok(q('considerada') === 100 && q('compAno') === 2400 && q('consAno') === 3600, 'tarifa social reduz só a média considerada; energia compartilhada e consumo anual não mudam');
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [100, 100, 100, 100, 300]);
+  const cx = w.document.querySelector('#alertList input'); cx.checked = true; cx.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ok(q('compAno') === 840 && q('consAno') === 1200, 'mês desconsiderado no alerta sai também do cálculo anual', txt(w, 'compAno'));
+  // visibilidade
+  base(w, 'ENERGISA - MT', ''); meses(w, [100, 100]); ok(!vis(w, 'compAno') && !vis(w, 'dispVal') && $(w, 'compNota').hidden && vis(w, 'consAno'), 'sem tipo: oculta disponibilidade e energia compartilhada; consumo anual continua');
+  $(w, 'limpar').click(); setv(w, 'tipo', 'Bifásico'); ok(!vis(w, 'compAno') && !vis(w, 'consAno') && $(w, 'compNota').hidden, 'sem meses informados: nada é estimado');
+  // edição, persistência e exportação
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [100, 100, 100]); setv(w, 'dispMono', 40);
+  ok(q('dispVal') === 40 && q('compAno') === 720, 'editar a disponibilidade recalcula na hora (100 - 40) x 12 = 720');
+  ok(JSON.parse(w.localStorage.getItem(KP)).disp['Monofásico'] === 40 && /ajustes locais/.test(txt(w, 'paramInfo')), 'ajuste da disponibilidade fica salvo como rascunho local e é sinalizado');
+  setv(w, 'dispMono', ''); setv(w, 'dispMono', -5); ok(q('compAno') === 720, 'valor vazio ou negativo na disponibilidade é ignorado');
+  w.URL.createObjectURL = b => { w.__blob = b; return 'blob:t'; }; w.HTMLAnchorElement.prototype.click = function () {};
+  $(w, 'exportar').click(); const txtExp = await new Promise(r => { const fr = new w.FileReader(); fr.onload = () => r(fr.result); fr.readAsText(w.__blob); }); const oe = {}; new Function('window', txtExp)(oe);
+  ok(oe.PARAMETROS.disponibilidade['Monofásico'] === 40 && oe.PARAMETROS.disponibilidade['Bifásico'] === 50 && oe.PARAMETROS.disponibilidade['Trifásico'] === 100, 'exportar parametros.js inclui a disponibilidade');
+  $(w, 'restaurar').click(); ok($(w, 'dispMono').value === '30' && q('compAno') === 840, 'restaurar volta a disponibilidade da tabela vigente (30)');
+  w.close();
+  // rascunho salvo, rascunho inválido e arquivo de parâmetros novo
+  let x = await open('consumo.html', { beforeParse(y) { y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, disp: { 'Monofásico': 45, 'Bifásico': 55, 'Trifásico': 105 } })); } });
+  ok($(x, 'dispMono').value === '45' && $(x, 'dispBi').value === '55' && $(x, 'dispTri').value === '105', 'rascunho local da mesma versão restaura a disponibilidade'); x.close();
+  x = await open('consumo.html', { beforeParse(y) { y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, disp: { 'Monofásico': -1 } })); } });
+  ok(!x.__errors.length && $(x, 'dispMono').value === '30' && $(x, 'dispTri').value === '100', 'disponibilidade inválida no armazenamento volta aos padrões', x.__errors.join('|')); x.close();
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, versao: '2099-01-01', disponibilidade: { 'Monofásico': 31, 'Bifásico': 51, 'Trifásico': 101 } }) + ';' } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [200]);
+  ok($(x, 'dispBi').value === '51' && num(txt(x, 'dispVal')) === 51 && num(txt(x, 'compAno')) === (200 - 51) * 12, 'nova tabela publicada no repositório muda a disponibilidade usada'); x.close();
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, disponibilidade: undefined }) + ';' } });
+  ok(!x.__errors.length && $(x, 'dispMono').value === '30' && $(x, 'dispTri').value === '100', 'tabela sem disponibilidade: usa 30 / 50 / 100 e não quebra', x.__errors.join('|')); x.close();
+  // propriedade: 120 casos aleatórios contra um modelo de referência
+  const w2 = await open('consumo.html'), q2 = id => num(txt(w2, id)), qa = (i, n) => { const e = w2.document.querySelectorAll('.acq')[i]; e.value = n; e.dispatchEvent(new w2.Event('input', { bubbles: true })); };
+  const DD = { 'Monofásico': 30, 'Bifásico': 50, 'Trifásico': 100 }; let erros = 0, amostra = '';
+  for (let i = 0; i < 120; i++) {
+    const t = TIPOS[ri(0, 2)]; base(w2, 'ENERGISA - MT', t); const arr = Array.from({ length: ri(1, 12) }, () => ri(0, 900)); meses(w2, arr);
+    const acq = [0, 0, 0, 0, 0].map(() => (rnd() < 0.4 ? ri(1, 3) : 0)); acq.forEach((n, j) => qa(j, n || '')); const ac = acq.reduce((s, n, j) => s + n * [100, 150, 250, 300, 400][j], 0);
+    let outros = 0; if (rnd() < 0.4) { const kw = ri(10, 200), n = ri(1, 3); setv(w2, 'oNome', 'P'); setv(w2, 'oKwh', kw); setv(w2, 'oQtd', n); $(w2, 'oAdd').click(); outros = kw * n; }
+    let ger = 0; if (rnd() < 0.4) { ger = ri(10, 300); chk(w2, 'gPossui', true); setv(w2, 'gKwh', ger); }
+    chk(w2, 'social', rnd() < 0.4);
+    const adic = ac + outros + ger, m = arr.reduce((a, b) => a + b, 0) / arr.length, cons = (m + adic) * 12, comp = arr.map(v => Math.max(0, v + adic - DD[t])).reduce((a, b) => a + b, 0) / arr.length * 12;
+    const gc = q2('compAno'), gk = q2('consAno');
+    if (!(Math.abs(gc - comp) < 0.011 && Math.abs(gk - cons) < 0.011 && q2('dispVal') === DD[t])) { erros++; if (!amostra) amostra = `${t} meses=${arr} adic=${adic} esperado comp ${comp.toFixed(2)} cons ${cons.toFixed(2)} obtido ${gc} / ${gk}`; }
+  }
+  ok(erros === 0, 'propriedade (120 casos aleatórios): energia compartilhada anual e consumo anual', erros + ' divergências. ' + amostra); w2.close();
+}
+
+/* ======================= M) MENSALIDADE AXS ESTIMADA (tabela de 30/09/2026) ======================= */
+const PDF_TARIFAS = {   // [tarifa compensável, "Tarifa AXS"] por bandeira, copiado do comunicado de 30/09/2026
+  'CEMIG - MG': { desc: 0.30, l: { 'Verde': [1.13756, 0.79629], 'Amarela': [1.16227, 0.81359], 'Vermelha I': [1.19608, 0.83726], 'Vermelha II': [1.24085, 0.86859] } },
+  'COPEL - PR · Faixa I': { desc: 0.20, l: { 'Verde': [0.76802, 0.61442], 'Amarela': [0.78687, 0.62950], 'Vermelha I': [0.81265, 0.65012], 'Vermelha II': [0.84679, 0.67743] } },
+  'COPEL - PR · Faixa II': { desc: 0.25, l: { 'Verde': [0.76802, 0.57602], 'Amarela': [0.78687, 0.59015], 'Vermelha I': [0.81265, 0.60949], 'Vermelha II': [0.84679, 0.63509] } },
+  'CPFL Paulista - SP': { desc: 0.10, l: { 'Verde': [0.85045, 0.76541], 'Amarela': [0.87480, 0.78732], 'Vermelha I': [0.90809, 0.81728], 'Vermelha II': [0.95217, 0.85695] } },
+  'ELEKTRO - SP': { desc: 0.10, l: { 'Verde': [1.00309, 0.90278], 'Amarela': [1.02703, 0.92433], 'Vermelha I': [1.05977, 0.95379], 'Vermelha II': [1.10313, 0.99281] } },
+  'ENERGISA - MT': { desc: 0.40, l: { 'Verde': [0.89942, 0.53965], 'Amarela': [0.91827, 0.55096], 'Vermelha I': [0.94405, 0.56643], 'Vermelha II': [0.97819, 0.58691] } },
+  'EQUATORIAL - GO': { desc: 0.30, l: { 'Verde': [1.10307, 0.77215], 'Amarela': [1.12648, 0.78854], 'Vermelha I': [1.15850, 0.81095], 'Vermelha II': [1.20090, 0.84063] } },
+};
+const BAND = ['Verde', 'Amarela', 'Vermelha I', 'Vermelha II'];
+const tarPDF = (d, b, f) => PDF_TARIFAS[d + (f ? ' · ' + f : '')].l[b][1];
+async function mensalidade() {
+  section('M) Mensalidade AXS estimada: (média - disponibilidade) x Tarifa AXS da distribuidora e da bandeira');
+  const T = PARAM.tarifasAXS; let div = 0, dif = '';
+  ok(!!T && T.vigenteDesde === '01/10/2026' && T.bandeiraPadrao === 'Verde' && BAND.every((b, i) => T.bandeiras[i] === b), 'parametros.js: tarifas vigentes desde 01/10/2026, bandeira Verde e as 4 bandeiras');
+  for (const [chave, { desc, l }] of Object.entries(PDF_TARIFAS)) for (const b of BAND) {
+    const [d, f] = chave.split(' · '), v = f ? T.valores[d][f][b] : T.valores[d][b], [comp, axs] = l[b];
+    if (v !== axs) { div++; dif = dif || `${chave}/${b}: ${v} != ${axs}`; }
+    if (Math.abs(comp * (1 - desc) - axs) > 0.00001) { div++; dif = dif || `PDF inconsistente ${chave}/${b}`; }
+  }
+  ok(div === 0, 'parametros.js confere com o comunicado (7 tabelas x 4 bandeiras = 28 tarifas) e cada Tarifa AXS = compensável x (1 - desconto)', dif);
+  const w = await open('consumo.html'), q = id => num(txt(w, id)), vis2 = id => !$(w, id).hidden;
+  ok([...$(w, 'bandeira').options].map(o => o.value).join() === BAND.join() && $(w, 'bandeira').value === 'Verde' && /01\/10\/2026/.test(txt(w, 'bandeiraInfo')) && /Verde/.test(txt(w, 'bandeiraInfo')), 'seletor de bandeira: 4 opções, Verde como padrão e aviso da vigência');
+  ok(w.document.querySelectorAll('#tarifas tr').length === 7 && w.document.querySelectorAll('#tarifas input').length === 28, 'tabela editável da Tarifa AXS: 7 linhas (Copel com 2 faixas) e 28 campos');
+  // exemplo: 4 meses de 500 kWh, bifásico, Energisa MT
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [500, 500, 500, 500]);
+  ok(q('presMes') === 450 && txt(w, 'tarifaVal') === '0,53965' && /R\$\s?242,84/.test(txt(w, 'mensal')), 'Energisa MT, Verde: (500 - 50) = 450 kWh x 0,53965 = R$ 242,84', txt(w, 'presMes') + ' | ' + txt(w, 'tarifaVal') + ' | ' + txt(w, 'mensal'));
+  ok(/ENERGISA - MT, bandeira Verde: 450,00 kWh × R\$ 0,53965\/kWh = R\$\s?242,84/.test(txt(w, 'mensNota')) && /depende da bandeira/.test(txt(w, 'mensNota')), 'nota mostra a conta e o aviso de estimativa', txt(w, 'mensNota'));
+  for (const [b, esp] of [['Amarela', 247.93], ['Vermelha I', 254.89], ['Vermelha II', 264.11], ['Verde', 242.84]]) { setv(w, 'bandeira', b); ok(Math.abs(q('mensal') - esp) < 0.006 && txt(w, 'tarifaVal') === tarPDF('ENERGISA - MT', b).toFixed(5).replace('.', ','), 'bandeira ' + b + ': mensalidade R$ ' + esp.toFixed(2), txt(w, 'mensal')); }
+  ok(q('media') === 500 && q('considerada') === 500 && q('compAno') === 5400 && q('consAno') === 6000, 'a média considerada e as linhas anuais continuam como antes (500 / 6.000 / 5.400)');
+  // todas as distribuidoras x bandeiras (monofásico, 3 meses de 200 kWh: 170 kWh de média estimada)
+  let errosT = 0, amostraT = ''; for (const d of ['CEMIG - MG', 'CPFL Paulista - SP', 'ELEKTRO - SP', 'ENERGISA - MT', 'EQUATORIAL - GO']) for (const b of BAND) {
+    base(w, d, 'Monofásico'); meses(w, [200, 200, 200]); setv(w, 'bandeira', b); const esp = Math.round(170 * tarPDF(d, b) * 100) / 100;
+    if (!(Math.abs(q('mensal') - esp) < 0.006 && vis2('presMes') === true)) { errosT++; amostraT = amostraT || `${d}/${b}: esperado ${esp} obtido ${txt(w, 'mensal')}`; } }
+  ok(errosT === 0, '5 distribuidoras x 4 bandeiras: mensalidade = 170 kWh x Tarifa AXS do comunicado', amostraT);
+  // Copel e as duas faixas
+  base(w, 'COPEL - PR', 'Trifásico'); meses(w, [400, 400]); setv(w, 'bandeira', 'Verde');
+  ok(!$(w, 'faixaBox').hidden && q('presMes') === 300 && txt(w, 'tarifaVal') === '0,61442' && /R\$\s?184,33/.test(txt(w, 'mensal')), 'Copel, Faixa I (20%): 300 kWh x 0,61442 = R$ 184,33', txt(w, 'mensal'));
+  setv(w, 'faixa', 'Faixa II'); ok(txt(w, 'tarifaVal') === '0,57602' && /R\$\s?172,81/.test(txt(w, 'mensal')) && /Faixa II/.test(txt(w, 'mensNota')), 'Copel, Faixa II (25%): 300 kWh x 0,57602 = R$ 172,81');
+  setv(w, 'bandeira', 'Vermelha II'); ok(txt(w, 'tarifaVal') === '0,63509', 'Copel, Faixa II, Vermelha II: 0,63509'); setv(w, 'faixa', 'Faixa I'); setv(w, 'bandeira', 'Verde');
+  setv(w, 'dist', 'ENERGISA - MT'); ok($(w, 'faixaBox').hidden, 'a escolha de faixa só aparece para a Copel');
+  // piso, extras, tarifa social
+  base(w, 'ENERGISA - MT', 'Monofásico'); meses(w, [20, 10]); ok(q('presMes') === 0 && /R\$\s?0,00/.test(txt(w, 'mensal')) && vis(w, 'mensal'), 'meses abaixo da disponibilidade: consumo presumido 0 e mensalidade R$ 0,00');
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [200]); const e = w.document.querySelectorAll('.acq')[1]; e.value = 1; e.dispatchEvent(new w.Event('input', { bubbles: true }));
+  ok(q('presMes') === 250 && /R\$\s?134,91/.test(txt(w, 'mensal')), 'com AC de 12.000 BTUs: (200 + 150 - 100) = 250 kWh x 0,53965 = R$ 134,91', txt(w, 'mensal'));
+  base(w, 'ENERGISA - MT', 'Trifásico'); meses(w, [300, 300, 300]); const antes = txt(w, 'mensal'); chk(w, 'social', true); ok(txt(w, 'mensal') === antes && q('considerada') === 100, 'tarifa social não altera a mensalidade estimada');
+  // visibilidade
+  base(w, '', 'Bifásico'); meses(w, [500]); ok(vis(w, 'presMes') && !vis(w, 'tarifaVal') && !vis(w, 'mensal') && $(w, 'mensNota').hidden, 'sem distribuidora: mostra só a média estimada; sem tarifa nem mensalidade');
+  base(w, 'ENERGISA - MT', ''); meses(w, [500]); ok(!vis(w, 'presMes') && !vis(w, 'mensal'), 'sem tipo de relógio: nada de mensalidade');
+  $(w, 'limpar').click(); setv(w, 'tipo', 'Bifásico'); setv(w, 'dist', 'ENERGISA - MT'); ok(!vis(w, 'mensal') && !vis(w, 'presMes'), 'sem meses informados: nada é estimado');
+  setv(w, 'nNome', 'CELESC - SC'); setv(w, 'nMono', 100); setv(w, 'nBi', 120); setv(w, 'nTri', 160); $(w, 'add').click(); base(w, 'CELESC - SC', 'Bifásico'); meses(w, [300]);
+  ok(vis(w, 'presMes') && !vis(w, 'mensal') && !w.__errors.length, 'distribuidora cadastrada sem tarifa AXS: não estima mensalidade e não quebra', w.__errors.join('|'));
+  // edição, persistência e exportação
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [500, 500, 500, 500]);
+  const cel = w.document.querySelector('#tarifas tr[data-d="ENERGISA - MT"] input[data-b="Verde"]'); cel.value = 0.6; cel.dispatchEvent(new w.Event('input', { bubbles: true }));
+  ok(/R\$\s?270,00/.test(txt(w, 'mensal')) && txt(w, 'tarifaVal') === '0,60000', 'editar a Tarifa AXS na tabela recalcula (450 x 0,60 = R$ 270,00)', txt(w, 'mensal'));
+  ok(JSON.parse(w.localStorage.getItem(KP)).tarifas['ENERGISA - MT']['Verde'] === 0.6 && /ajustes locais/.test(txt(w, 'paramInfo')), 'ajuste da tarifa fica salvo como rascunho local e é sinalizado');
+  cel.value = ''; cel.dispatchEvent(new w.Event('input', { bubbles: true })); cel.value = -1; cel.dispatchEvent(new w.Event('input', { bubbles: true })); ok(txt(w, 'tarifaVal') === '0,60000', 'valor vazio ou negativo na tabela é ignorado');
+  const cf = w.document.querySelector('#tarifas tr[data-d="COPEL - PR"][data-f="Faixa II"] input[data-b="Amarela"]'); cf.value = 0.7; cf.dispatchEvent(new w.Event('input', { bubbles: true })); ok(w.eval('TARIFAS["COPEL - PR"]["Faixa II"]["Amarela"]') === 0.7 && w.eval('TARIFAS["COPEL - PR"]["Faixa I"]["Amarela"]') === 0.6295, 'editar a faixa II da Copel não mexe na faixa I');
+  w.URL.createObjectURL = bl => { w.__blob = bl; return 'blob:t'; }; w.HTMLAnchorElement.prototype.click = function () {};
+  $(w, 'exportar').click(); const ex = await new Promise(r => { const fr = new w.FileReader(); fr.onload = () => r(fr.result); fr.readAsText(w.__blob); }); const oe = {}; new Function('window', ex)(oe);
+  ok(oe.PARAMETROS.tarifasAXS.valores['ENERGISA - MT']['Verde'] === 0.6 && oe.PARAMETROS.tarifasAXS.bandeiraPadrao === 'Verde' && oe.PARAMETROS.tarifasAXS.vigenteDesde === '01/10/2026' && oe.PARAMETROS.tarifasAXS.bandeiras.length === 4, 'exportar parametros.js inclui a tabela de tarifas editada, a vigência e as bandeiras');
+  $(w, 'restaurar').click(); ok(w.eval('TARIFAS["ENERGISA - MT"]["Verde"]') === 0.53965 && w.document.querySelector('#tarifas tr[data-d="ENERGISA - MT"] input[data-b="Verde"]').value === '0.53965' && /R\$\s?242,84/.test(txt(w, 'mensal')), 'restaurar volta à tabela vigente (0,53965)');
+  w.close();
+  // rascunho, rascunho inválido, tabela nova e ausente
+  let x = await open('consumo.html', { beforeParse(y) { const t = JSON.parse(JSON.stringify(PARAM.tarifasAXS.valores)); t['ENERGISA - MT']['Verde'] = 0.55; y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, tarifas: t })); } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok(num(txt(x, 'tarifaVal')) === 0.55, 'rascunho local da mesma versão restaura a tabela de tarifas'); x.close();
+  x = await open('consumo.html', { beforeParse(y) { y.localStorage.setItem(KP, JSON.stringify({ versao: PARAM.versao, params: PARAM.distribuidoras, tarifas: { 'ENERGISA - MT': { 'Verde': -1 } } })); } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok(!x.__errors.length && num(txt(x, 'tarifaVal')) === 0.53965, 'tarifas inválidas no armazenamento voltam à tabela vigente', x.__errors.join('|')); x.close();
+  const novaT = JSON.parse(JSON.stringify(PARAM.tarifasAXS)); novaT.valores['ENERGISA - MT']['Verde'] = 0.5; novaT.bandeiraPadrao = 'Amarela';
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, versao: '2099-01-01', tarifasAXS: novaT }) + ';' } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok($(x, 'bandeira').value === 'Amarela' && num(txt(x, 'tarifaVal')) === 0.55096 && /R\$\s?247,93/.test(txt(x, 'mensal')), 'nova tabela publicada: bandeira padrão e tarifas vêm do arquivo (Amarela: 0,55096)'); setv(x, 'bandeira', 'Verde'); ok(num(txt(x, 'tarifaVal')) === 0.5, 'a tarifa nova do arquivo é usada (Verde: 0,50)'); x.close();
+  x = await open('consumo.html', { over: { 'parametros.js': 'window.PARAMETROS=' + JSON.stringify({ ...PARAM, tarifasAXS: undefined }) + ';' } });
+  base(x, 'ENERGISA - MT', 'Bifásico'); meses(x, [500]); ok(!x.__errors.length && x.document.getElementById('mensal').parentElement.hidden && x.document.getElementById('bandeira').options.length === 0 && num(txt(x, 'compAno')) === 5400, 'tabela sem tarifas AXS: não estima mensalidade, mantém o restante e não quebra', x.__errors.join('|')); x.close();
+  // propriedade: 100 casos aleatórios contra um modelo de referência
+  const w2 = await open('consumo.html'), q2 = id => num(txt(w2, id)), qa = (i, n) => { const el = w2.document.querySelectorAll('.acq')[i]; el.value = n; el.dispatchEvent(new w2.Event('input', { bubbles: true })); };
+  const DD = { 'Monofásico': 30, 'Bifásico': 50, 'Trifásico': 100 }, DS = ['CEMIG - MG', 'COPEL - PR', 'CPFL Paulista - SP', 'ELEKTRO - SP', 'ENERGISA - MT', 'EQUATORIAL - GO']; let erros = 0, amostra = '';
+  for (let i = 0; i < 100; i++) {
+    const d = DS[ri(0, 5)], t = TIPOS[ri(0, 2)], b = BAND[ri(0, 3)], f = d === 'COPEL - PR' ? (rnd() < 0.5 ? 'Faixa I' : 'Faixa II') : null;
+    base(w2, d, t); const arr = Array.from({ length: ri(1, 12) }, () => ri(0, 900)); meses(w2, arr); setv(w2, 'bandeira', b); if (f) setv(w2, 'faixa', f);
+    const acq = [0, 0, 0, 0, 0].map(() => (rnd() < 0.4 ? ri(1, 3) : 0)); acq.forEach((n, j) => qa(j, n || '')); const ac = acq.reduce((s, n, j) => s + n * [100, 150, 250, 300, 400][j], 0);
+    let outros = 0; if (rnd() < 0.4) { const kw = ri(10, 200), n = ri(1, 3); setv(w2, 'oNome', 'P'); setv(w2, 'oKwh', kw); setv(w2, 'oQtd', n); $(w2, 'oAdd').click(); outros = kw * n; }
+    let ger = 0; if (rnd() < 0.4) { ger = ri(10, 300); chk(w2, 'gPossui', true); setv(w2, 'gKwh', ger); }
+    chk(w2, 'social', rnd() < 0.4);
+    const adic = ac + outros + ger, pres = arr.map(v => Math.max(0, v + adic - DD[t])).reduce((a, c) => a + c, 0) / arr.length, esp = Math.round(pres * tarPDF(d, b, f) * 100) / 100;
+    if (!(Math.abs(q2('mensal') - esp) < 0.006 && Math.abs(q2('presMes') - pres) < 0.006)) { erros++; amostra = amostra || `${d} ${f || ''} ${b} ${t} meses=${arr} adic=${adic} esperado ${esp} obtido ${txt(w2, 'mensal')}`; }
+  }
+  ok(erros === 0, 'propriedade (100 casos aleatórios): média estimada mensal e mensalidade', erros + ' divergências. ' + amostra); w2.close();
+}
+
+/* ======================= N) CELULAR ======================= */
+async function celular() {
+  section('N) Celular: viewport, barra inferior, campos de 16 px / toques de 44 px e altura do iframe');
+  const lerS = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  for (const pg of ['index', 'indicacao', 'consumo', 'proposta']) {
+    const h = lerS(pg + '.html');
+    ok(/<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">/.test(h), pg + ': viewport com viewport-fit=cover (iPhone com notch)');
+    ok(/<meta name="color-scheme" content="light dark">/.test(h) && (h.match(/<meta name="theme-color"/g) || []).length === 2, pg + ': color-scheme e theme-color claro/escuro (barra do navegador e modo escuro forçado do Samsung)');
+    ok(/css\/mobile\.css\?v=/.test(h) && h.indexOf('css/mobile.css') > h.indexOf('css/' + pg + '.css'), pg + ': mobile.css carregado depois do css da página');
+    ok(/user-scalable\s*=\s*no|maximum-scale/.test(h) === false, pg + ': zoom do usuário não é bloqueado (acessibilidade)');
+    ok(pg === 'index' ? !/js\/altura\.js/.test(h) : /js\/altura\.js\?v=/.test(h), pg + (pg === 'index' ? ': menu não usa altura.js' : ': informa a altura ao menu (altura.js)'));
+  }
+  const mc = lerS('css/mobile.css'), ic = lerS('css/index.css');
+  ok(/text-size-adjust:100%/.test(mc) && /pointer:coarse/.test(mc) && /min-height:44px/.test(mc) && /font-size:16px/.test(mc) && /safe-area-inset-left/.test(mc) && /touch-action:manipulation/.test(mc), 'mobile.css: sem aumento de fonte do iOS, fonte 16 px, alvos de 44 px, notch e toque sem atraso');
+  const bloco = ic.slice(ic.indexOf('@media (max-width:720px), (max-height:480px) and (pointer:coarse)'));
+  ok(/position:fixed/.test(bloco) && /bottom:0/.test(bloco) && /safe-area-inset-bottom/.test(bloco) && /repeat\(4,1fr\)/.test(bloco) && /attr\(data-ic\)/.test(bloco) && /attr\(data-curto\)/.test(bloco), 'index.css: no celular a navegação vira barra de 4 abas fixa embaixo, respeitando a área do botão home do iPhone');
+  ok(/@media \(max-height:480px\) and \(pointer:coarse\)\{/.test(ic) && /\.nav-links a::after\{display:none\}/.test(ic), 'index.css: celular deitado usa a mesma barra, só com os ícones');
+  const w = await open('index.html'); const links = [...w.document.querySelectorAll('#nav .nav-links a')];
+  ok(links.length === 4 && links.every(a => a.dataset.ic && a.dataset.curto && a.getAttribute('aria-label') === a.textContent.trim()), 'abas: ícone, rótulo curto e nome completo acessível (aria-label) em cada uma', links.map(a => a.dataset.curto).join('|'));
+  w.close();
+  // altura do iframe (só no celular)
+  const mm = movel => x => { x.matchMedia = q => ({ matches: !!movel && /max-width:720px/.test(q), media: q, addEventListener() {}, removeEventListener() {} }); };
+  let h = await open('index.html', { hash: '#consumo', beforeParse: mm(true) }); await sleep(800); let src = $(h, 'frame').contentWindow;
+  const alt = (px, s) => { h.dispatchEvent(new h.MessageEvent('message', { data: { tipo: 'altura', px }, source: s })); };
+  alt(1234.2, src); ok($(h, 'frame').style.height === '1235px', 'celular: iframe ganha a altura do conteúdo (1.234,2 -> 1235 px)', $(h, 'frame').style.height);
+  alt(900, src); ok($(h, 'frame').style.height === '900px', 'celular: altura acompanha o conteúdo quando ele encolhe');
+  alt(-5, src); ok($(h, 'frame').style.height === '', 'altura inválida volta ao padrão do css');
+  alt(700, h); ok($(h, 'frame').style.height === '', 'mensagem de altura que não vem do iframe é ignorada');
+  h.close();
+  h = await open('index.html', { hash: '#consumo', beforeParse: mm(false) }); await sleep(800); src = $(h, 'frame').contentWindow;
+  h.dispatchEvent(new h.MessageEvent('message', { data: { tipo: 'altura', px: 1500 }, source: src })); ok($(h, 'frame').style.height === '', 'computador/tablet: o iframe continua preenchendo a tela (altura não é fixada)');
+  h.close();
+  // o simulador informa a altura ao menu
+  h = await open('index.html', { hash: '#indicacao' }); const msgs = []; h.postMessage = m => { if (m && m.tipo === 'altura') msgs.push(m); }; await sleep(800);
+  const c = $(h, 'frame').contentWindow; c.document.body.getBoundingClientRect = () => ({ height: 777.4 }); c.dispatchEvent(new c.Event('resize')); await sleep(100);
+  ok(msgs.some(m => m.px === 778), 'simulador informa ao menu a altura do conteúdo (777,4 -> 778)', JSON.stringify(msgs)); h.close();
+  const solo = await open('indicacao.html'); const m2 = []; solo.postMessage = m => m2.push(m); solo.document.body.getBoundingClientRect = () => ({ height: 500 }); solo.dispatchEvent(new solo.Event('resize')); await sleep(50); ok(!m2.length, 'fora do menu o simulador não envia altura'); solo.close();
+}
+
+/* ======================= O) CORREÇÕES DA 1.5.1 (QA de estresse) ======================= */
+async function correcoes151() {
+  section('O) Correções da 1.5.1: travamento da indicação, rótulos, limites, leitura de fatura e menu');
+  const lerS = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  // E-01 indicação
+  let w = await open('indicacao.html'); const tempo = (fn) => { const t = Date.now(); fn(); return Date.now() - t; };
+  ok(!/plan\.push|let plan/.test(lerS('js/indicacao.js')), 'indicação: o laço que montava o plano mês a mês foi removido');
+  ok($(w, 'fInd').min === '1' && $(w, 'fInd').max === '10000000' && $(w, 'fInv').min === '1' && $(w, 'fInv').max === '10000000', 'indicação: campos de fatura com mínimo R$ 1 e máximo R$ 10.000.000');
+  for (const [a, b] of [[0.01, 1000000], [1e308, 1e308], [0.5, 100], [10000000.01, 100], [100, 10000001], [1e305, 100]]) {
+    const ms = tempo(() => { setv(w, 'pInv', 100); setv(w, 'pInd', 100); setv(w, 'fInv', 100); setv(w, 'fInd', 100); $(w, 'fInd').value = String(a); $(w, 'fInv').value = String(b); $(w, 'fInv').dispatchEvent(new w.Event('input', { bubbles: true })); });
+    ok(/entre R\$ 1,00 e R\$ 10\.000\.000,00/.test(txt(w, 'out')) && ms < 500, `indicação: fatura ${a} x ${b} é recusada com aviso, sem travar (${ms} ms)`);
+  }
+  setv(w, 'fInd', 1); setv(w, 'fInv', 1); setv(w, 'pInv', 100); setv(w, 'pInd', 100); ok(/isenta por 1 mês/.test(txt(w, 'out')), 'indicação: R$ 1,00 e R$ 1,00 (limite mínimo) calcula');
+  let ms = tempo(() => { setv(w, 'fInv', 10000000); setv(w, 'fInd', 1); });
+  ok(ms < 500 && /isenta por 10000000 meses/.test(txt(w, 'out')) && /cobre 10\.000\.000 meses \(mais de 10 anos\)/.test(txt(w, 'out')), `indicação: razão máxima (R$ 1 contra R$ 10 milhões) termina em ${ms} ms e avisa para conferir`, txt(w, 'out').slice(0, 120));
+  setv(w, 'fInd', 100); setv(w, 'fInv', 12000); ok(!/mais de 10 anos/.test(txt(w, 'out')) && /isenta por 120 meses/.test(txt(w, 'out')), 'indicação: 120 meses exatos não gera aviso');
+  setv(w, 'fInv', 12100); ok(/isenta por 121 meses/.test(txt(w, 'out')) && /mais de 10 anos/.test(txt(w, 'out')), 'indicação: 121 meses gera aviso'); w.close();
+  // E-04 rótulos, E-02/E-07/E-11/E-12 limites no consumo
+  w = await open('consumo.html'); const d = w.document;
+  const nome = e => (e.getAttribute('aria-label') || (e.id && (d.querySelector('label[for="' + e.id + '"]') || {}).textContent) || (e.closest('label') || {}).textContent || e.getAttribute('title') || (e.tagName === 'BUTTON' ? e.textContent : '') || '').trim();
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [300, 300]);
+  const qa = (i, n) => { const e = d.querySelectorAll('.acq')[i]; e.value = n; e.dispatchEvent(new w.Event('input', { bubbles: true })); }; qa(0, 2);
+  setv(w, 'oNome', 'Chuveiro'); setv(w, 'oKwh', 80); $(w, 'oAdd').click(); setv(w, 'nNome', 'CELESC - SC'); setv(w, 'nMono', 1); setv(w, 'nBi', 1); setv(w, 'nTri', 1); $(w, 'add').click();
+  const sem = [...d.querySelectorAll('input:not([type=hidden]),select,textarea,button')].filter(e => !nome(e)).map(e => (e.id || e.className || e.tagName) + (e.dataset.d ? '@' + e.dataset.d : ''));
+  ok(sem.length === 0, 'consumo: todos os campos e botões têm nome acessível (antes: 51 sem rótulo)', sem.slice(0, 5).join(', '));
+  ok([...d.querySelectorAll('th')].every(t => t.textContent.trim().length > 0), 'consumo: nenhum cabeçalho de tabela vazio');
+  ok(/9\.000 BTUs/.test(d.querySelector('.acq').getAttribute('aria-label')) && /9\.000 BTUs \(kWh/.test(d.querySelector('.ack').getAttribute('aria-label')), 'rótulos do ar-condicionado dizem o modelo');
+  ok(d.querySelector('#params input[data-k="Monofásico"]').getAttribute('aria-label') === 'CEMIG - MG, Monofásico: consumo mínimo em kWh', 'rótulo dos parâmetros: distribuidora, tipo e unidade');
+  ok(d.querySelector('#tarifas input[data-b="Verde"]').getAttribute('aria-label') === 'Tarifa AXS CEMIG - MG, bandeira Verde (R$/kWh)' && /Faixa II, bandeira Amarela/.test(d.querySelector('#tarifas tr[data-f="Faixa II"] input[data-b="Amarela"]').getAttribute('aria-label')), 'rótulo das tarifas: distribuidora, faixa e bandeira');
+  ok(d.querySelector('.oq').getAttribute('aria-label') === 'Quantidade de Chuveiro' && d.querySelector('[data-del]').getAttribute('aria-label') === 'Remover Chuveiro', 'rótulo dos produtos: quantidade e remover pelo nome');
+  // limites
+  const al = () => w.__alerts || 0; let a0 = al(); setv(w, 'oNome', 'x'.repeat(100)); setv(w, 'oKwh', 10); $(w, 'oAdd').click(); ok(d.querySelectorAll('.orow:not(.ohead)')[1].children[0].textContent.length === 60, 'produto: nome cortado em 60 caracteres');
+  setv(w, 'oNome', 'Forno'); setv(w, 'oKwh', 100001); $(w, 'oAdd').click(); ok(al() === a0 + 1, 'produto: consumo acima de 100.000 kWh é recusado');
+  setv(w, 'oKwh', 10); setv(w, 'oQtd', 1001); $(w, 'oAdd').click(); ok(al() === a0 + 2, 'produto: quantidade acima de 1.000 é recusada');
+  setv(w, 'oQtd', 1); for (let i = 0; i < 60; i++) { setv(w, 'oNome', 'P' + i); setv(w, 'oKwh', 1); $(w, 'oAdd').click(); }
+  ok(d.querySelectorAll('.orow:not(.ohead)').length === 50 && al() >= a0 + 2 + 10, 'produtos: no máximo 50 por simulação, os demais são recusados com aviso', String(d.querySelectorAll('.orow:not(.ohead)').length));
+  setv(w, 'nNome', 'D'.repeat(100)); setv(w, 'nMono', 1); setv(w, 'nBi', 1); setv(w, 'nTri', 1); $(w, 'add').click(); ok([...$(w, 'dist').options].some(o => o.value === 'D'.repeat(40)) && ![...$(w, 'dist').options].some(o => o.value.length > 40), 'distribuidora: nome cortado em 40 caracteres');
+  ok($(w, 'oNome').maxLength === 60 && $(w, 'nNome').maxLength === 40 && $(w, 'oKwh').max === '100000' && $(w, 'oQtd').max === '1000', 'campos de produto e distribuidora com os limites no HTML');
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [1000000, 1000001, -1, 'abc', 300]);
+  ok(txt(w, 'qtd') === '2' && d.getElementById('m1').getAttribute('aria-invalid') === 'false' && d.getElementById('m2').getAttribute('aria-invalid') === 'true' && d.getElementById('m3').getAttribute('aria-invalid') === 'true' && d.getElementById('m5').getAttribute('aria-invalid') === 'false', 'meses: 0 a 1.000.000 kWh valem; acima, negativo ou texto é ignorado e marcado como inválido', txt(w, 'qtd'));
+  ok(d.getElementById('m1').max === '1000000', 'campos de mês com máximo de 1.000.000 no HTML');
+  // E-05 leitura de fatura contra textos hostis (cada um precisa terminar em menos de 1,5 s)
+  const hostis = { 'JAN + 200.000 espaços': 'JAN' + ' '.repeat(200000) + 'x', '"JAN26 " x 100.000': 'JAN26 '.repeat(100000), '"1 " x 300.000': '1 '.repeat(300000), '"JAN/26 345 " x 50.000': 'JAN/26 345 '.repeat(50000), '"/-. " x 500.000': '/-. '.repeat(500000), '"JAN 26 " x 100.000': 'JAN 26 '.repeat(100000), 'linha única de 1 MB': 'JAN26 345 '.repeat(100000), 'texto de 3 MB': 'ENERGIA CONSUMO 12 '.repeat(160000) };
+  for (const [n, tx] of Object.entries(hostis)) { const m = tempo(() => w.analisarFatura(tx)); ok(m < 1500, `leitura de fatura: ${n} em ${m} ms (antes: até 88 s)`); }
+  const bl = w.blocoMesesValores('X JAN26 DEZ25 NOV25 OUT25 SET25 161 223 115 145 70 31 32 Y'); ok(bl && bl.rot.length === 5 && bl.nums.join() === '161,223,115,145,70', 'bloco de meses e valores é encontrado (formato Copel)');
+  ok(w.blocoMesesValores('JAN 26 DEZ/25 NOV-25 OUT25 SET.25 1 2 3 4 5') && w.blocoMesesValores('JAN26 DEZ25 NOV25 OUT25 1 2 3 4 5') === null && w.blocoMesesValores('JAN26 DEZ25 NOV25 OUT25 SET25 1 2 3 4') === null, 'bloco: aceita "JAN 26", "DEZ/25", "NOV-25"; exige 5 meses e valores suficientes');
+  ok(w.analisarFatura('A'.repeat(1000000)).meses.length === 0, 'texto de 1 MB sem conteúdo útil é tratado e limitado');
+  w.close();
+  // E-09/E-13 menu
+  let h = await open('index.html'); const dd = h.document;
+  ok(dd.querySelectorAll('main').length === 1 && dd.querySelector('main#conteudo #menu') && dd.querySelector('main#conteudo #tool') && dd.querySelector('main#conteudo').getAttribute('tabindex') === '-1', 'menu: uma região principal (main) com o menu e a tela dentro');
+  const foc = [...dd.querySelectorAll('a[href],button,input,select')][0]; ok(foc.classList.contains('pular') && foc.getAttribute('href') === '#conteudo' && /Pular para o conteúdo/.test(foc.textContent), 'menu: o primeiro item do teclado é "Pular para o conteúdo"');
+  const hash0 = h.location.hash; foc.click(); ok(h.location.hash === hash0 && dd.activeElement.id === 'conteudo', 'pular para o conteúdo move o foco sem mudar o endereço (que escolhe a tela)'); h.close();
+  const ic = lerS('css/index.css'); ok(!/@media\(max-width:900px\)\{#nav\{grid-template-columns:1fr auto\}/.test(ic), 'menu: removida a regra que fazia a barra rolar entre 721 e 900 px (aba cortada)');
+  ok(/@media\(min-width:721px\) and \(max-width:1260px\)\{[^}]*#nav \.nav-links a\{font-size:0;[^}]*\}[^}]*attr\(data-ic\)[^}]*\}[^}]*attr\(data-curto\)/.test(ic), 'menu: de 721 a 1.260 px a barra usa ícone + rótulo curto numa linha só');
+  ok(/@media\(max-width:340px\)\{\.nav-esq\{display:none\}/.test(ic), 'menu: abaixo de 340 px ficam só a chave e a versão');
+  ok(/\.pular:focus\{top:8px\}/.test(ic), 'menu: o link de pular aparece ao receber o foco');
+  const pc = lerS('css/proposta.css'), ph = lerS('proposta.html');
+  ok([['pConsultor', 60], ['pCliente', 80], ['pUC', 30], ['pValidade', 20], ['pCargo', 60], ['pB1', 40], ['pB2', 40], ['pB3', 40], ['pObs', 1500]].every(([id, n]) => new RegExp('id="' + id + '" maxlength="' + n + '"').test(ph)), 'proposta: limites de tamanho em todos os campos de texto');
+  ok(/\.px-signature-name[^{]*\{[^}]*overflow-wrap:anywhere/.test(pc), 'proposta: assinatura, cargo, benefícios e cartões quebram palavras longas');
+  ok(/\.duas>\*\{min-width:0\}/.test(lerS('css/proposta.css')) && /@media\(max-width:340px\)\{\.duas\{grid-template-columns:minmax\(0,1fr\)\}\}/.test(lerS('css/proposta.css')), 'proposta: data e validade em uma coluna abaixo de 340 px');
+  ok(/\.scroll\{position:relative\}/.test(lerS('css/consumo.css')), 'css: o bloco de rolagem das tabelas contém o texto invisível (.sr-only), sem alargar a página em 280 px');
+  ok(/\.orow>\*,\.acrow>\*\{min-width:0\}/.test(lerS('css/consumo.css')) && /\.addrow>\*,\.oadd>\*\{min-width:0\}/.test(lerS('css/consumo.css')) && /@media\(max-width:480px\)\{\s*\.addrow\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/.test(lerS('css/consumo.css')) && /\.layout\{grid-template-columns:minmax\(0,1fr\)\}\.col-b\{order:1\}/.test(lerS('css/consumo.css')) && /\.col-a,\.col-b,\.col-c\{min-width:0\}/.test(lerS('css/consumo.css')) && /\.sr-only\{/.test(lerS('css/mobile.css')), 'css: coluna única do celular com minmax(0,1fr) (tabelas rolam no cartão), formulários de adicionar e linhas de produto/AC encolhem; classe .sr-only');
+}
+
 /* ======================= F) MENU/HUB, ESTATÍSTICAS E RASTREIO ======================= */
 async function hub() {
   section('F) Menu, navegação, estatísticas e contagem');
   let w = await open('index.html'); ok(!w.__errors.length, 'menu carrega sem erros', w.__errors.join('|'));
   const est = () => [...w.document.querySelectorAll('#nav a')].map(a => a.dataset.k + (a.classList.contains('ativo') ? '*' : '')).join(' ');
   const clica = async k => { w.document.querySelector('#nav a[data-k=' + k + ']').click(); await sleep(60); };
-  ok(est() === 'inicio* indicacao consumo' && !$(w, 'menu').classList.contains('oculto'), 'início: página principal ativa');
-  ok([...w.document.querySelectorAll('#nav a')].map(a => a.textContent).join('|') === 'Página principal|Simulação de indicação|Simulação de consumo de energia', 'barra: os 3 itens pedidos');
-  await clica('indicacao'); ok(est() === 'inicio indicacao* consumo' && $(w, 'frame').getAttribute('src') === 'indicacao.html' && $(w, 'menu').classList.contains('oculto'), 'ir para indicação');
-  await clica('consumo'); ok(est() === 'inicio indicacao consumo*' && $(w, 'frame').getAttribute('src') === 'consumo.html', 'ir para consumo');
-  await clica('inicio'); ok(est() === 'inicio* indicacao consumo' && !$(w, 'frame').hasAttribute('src'), 'voltar à página principal libera o iframe');
-  w.document.querySelector('.opt[data-k=consumo]').click(); await sleep(60); ok(est() === 'inicio indicacao consumo*', 'cartão do menu abre o simulador');
-  w.history.back(); await sleep(120); ok(est() === 'inicio* indicacao consumo', 'botão voltar do navegador funciona', est());
+  ok(est() === 'inicio* indicacao consumo proposta' && !$(w, 'menu').classList.contains('oculto'), 'início: página principal ativa');
+  ok([...w.document.querySelectorAll('#nav a')].map(a => a.textContent).join('|') === 'Página principal|Simulação de indicação|Simulação de consumo de energia|Proposta de oferta', 'barra: os 4 itens (início, indicação, consumo e proposta)');
+  const VV = {}; new Function('window', fs.readFileSync(path.join(ROOT, 'versao.js'), 'utf8'))(VV);
+  ok(txt(w, 'versaoNav') === 'v' + VV.VERSAO.numero && txt(w, 'versao').includes('Versão ' + VV.VERSAO.numero), 'versão exibida na barra e no rodapé do menu', txt(w, 'versaoNav') + ' / ' + txt(w, 'versao'));
+  await clica('indicacao'); ok(est() === 'inicio indicacao* consumo proposta' && $(w, 'frame').getAttribute('src') === 'indicacao.html' && $(w, 'menu').classList.contains('oculto'), 'ir para indicação');
+  await clica('consumo'); ok(est() === 'inicio indicacao consumo* proposta' && $(w, 'frame').getAttribute('src') === 'consumo.html', 'ir para consumo');
+  await clica('inicio'); ok(est() === 'inicio* indicacao consumo proposta' && !$(w, 'frame').hasAttribute('src'), 'voltar à página principal libera o iframe');
+  w.document.querySelector('.opt[data-k=consumo]').click(); await sleep(60); ok(est() === 'inicio indicacao consumo* proposta', 'cartão do menu abre o simulador');
+  w.history.back(); await sleep(120); ok(est() === 'inicio* indicacao consumo proposta', 'botão voltar do navegador funciona', est());
   ok(w.document.querySelector('#nav a.ativo').getAttribute('aria-current') === 'page', 'item ativo tem aria-current'); w.close();
-  w = await open('index.html', { hash: '#consumo' }); ok(est() === 'inicio indicacao consumo*', 'link direto #consumo abre o simulador'); w.close();
-  w = await open('index.html', { hash: '#qualquercoisa' }); ok(est() === 'inicio* indicacao consumo', 'hash inválido cai na página principal'); w.close();
+  w = await open('index.html', { hash: '#consumo' }); ok(est() === 'inicio indicacao consumo* proposta', 'link direto #consumo abre o simulador'); w.close();
+  w = await open('index.html', { hash: '#qualquercoisa' }); ok(est() === 'inicio* indicacao consumo proposta', 'hash inválido cai na página principal'); w.close();
   w = await open('index.html'); ok($(w, 'stats').hidden, 'sem código GoatCounter o painel de uso fica oculto'); ok(!w.document.querySelector('script[src*="goatcounter"]'), 'sem código GoatCounter nenhum script externo é carregado'); w.close();
   // com GoatCounter configurado (rede simulada)
   const calls = [];
-  const mock = u => Promise.resolve({ ok: !String(u).includes('falha'), json: () => Promise.resolve(String(u).includes('worker.test') ? [{ name: 'Brasil', count: 50 }, { name: '<b>X</b>', count: 7 }, { name: 'C', count: 6 }, { name: 'D', count: 5 }, { name: 'E', count: 4 }, { name: 'F', count: 3 }] : String(u).includes('simulacao-indicacao') ? { count: '1,234' } : String(u).includes('simulacao-consumo') ? { count: '66' } : { count: '9,999' }) });
+  const mock = u => Promise.resolve({ ok: !String(u).includes('falha'), json: () => Promise.resolve(String(u).includes('worker.test') ? [{ name: 'Brasil', count: 50 }, { name: '<b>X</b>', count: 7 }, { name: 'C', count: 6 }, { name: 'D', count: 5 }, { name: 'E', count: 4 }, { name: 'F', count: 3 }] : String(u).includes('proposta-gerada') ? { count: '12' } : String(u).includes('simulacao-indicacao') ? { count: '1,234' } : String(u).includes('simulacao-consumo') ? { count: '66' } : { count: '9,999' }) });
   w = await open('index.html', { over: { 'config.js': "window.CONFIG={goatcounter:'teste',locationsUrl:'https://worker.test/top'};" }, beforeParse(x) { x.fetch = mock; } });
   ok(!!w.document.querySelector('script[src*="gc.zgo.at"]') && w.document.querySelector('script[src*="gc.zgo.at"]').getAttribute('data-goatcounter') === 'https://teste.goatcounter.com/count', 'script do GoatCounter com a URL correta');
   await sleep(1900); ok(!$(w, 'stats').hidden, 'painel de uso visível'); ok(num(txt(w, 'kAcessos')) === 9999, 'acessos exibidos (9.999)', txt(w, 'kAcessos')); ok(num(txt(w, 'kSims')) === 1300 && /1\.234/.test(txt(w, 'kSimsDet')), 'simulações = indicação + consumo (1.234 + 66)', txt(w, 'kSims') + ' ' + txt(w, 'kSimsDet'));
+  ok(num(txt(w, 'kProps')) === 12, 'propostas geradas exibidas (12)', txt(w, 'kProps'));
   const li = [...w.document.querySelectorAll('#top5 li')]; ok(li.length === 5 && /Brasil/.test(li[0].textContent), 'Top 5 localidades limitado a 5 itens'); ok(!w.document.querySelector('#top5 b b') && !/<b>/.test(li[1] ? li[1].innerHTML.replace(/<span>.*?<\/span>|<b>[^<]*<\/b>/g, '') : ''), 'nome de localidade é escapado (sem HTML injetado)');
   w.goatcounter = { count: o => calls.push(o) }; const fr = $(w, 'frame').contentWindow || w;
   w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'simulacao', ferramenta: 'indicacao' }, source: w })); await sleep(30); ok(calls.length === 0, 'mensagem que não vem do iframe é ignorada');
@@ -306,7 +769,12 @@ async function hub() {
   w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'simulacao', ferramenta: 'indicacao' }, source: src })); await sleep(700);
   ok(calls.length === 1 && calls[0].path === '/simulacao-indicacao' && calls[0].event === true, 'mensagem do iframe registra evento /simulacao-indicacao', JSON.stringify(calls));
   w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'simulacao', ferramenta: 'inexistente' }, source: src })); await sleep(700); ok(calls.length === 1, 'ferramenta desconhecida é ignorada');
+  w.dispatchEvent(new w.MessageEvent('message', { data: { tipo: 'proposta', formato: 'pdf' }, source: src })); await sleep(700); ok(calls.length === 2 && calls[1].path === '/proposta-gerada' && calls[1].event === true, 'proposta gerada registra evento /proposta-gerada', JSON.stringify(calls[1]));
   w.close();
+  // não contar as próprias visitas
+  w = await open('index.html', { query: '?contar=nao', over: { 'config.js': "window.CONFIG={goatcounter:'teste'};" }, beforeParse(x) { x.fetch = mock; } });
+  ok(w.localStorage.getItem('skipgc') === 't', '?contar=nao liga a opção de não contar visitas'); await sleep(1900); ok(/não estão sendo contadas/.test(txt(w, 'stats')), 'painel avisa que as visitas deste navegador não são contadas'); w.close();
+  w = await open('index.html', { query: '?contar=sim', beforeParse(x) { x.localStorage.setItem('skipgc', 't'); } }); ok(w.localStorage.getItem('skipgc') === null, '?contar=sim volta a contar'); w.close();
   // falha do contador não quebra o menu
   w = await open('index.html', { over: { 'config.js': "window.CONFIG={goatcounter:'falha',locationsUrl:'https://worker.test/falha'};" }, beforeParse(x) { x.fetch = mock; } });
   await sleep(1900); ok(!w.__errors.length && txt(w, 'kAcessos') === '-', 'falha na rede: mostra "-" sem erro de script', w.__errors.join('|') + txt(w, 'kAcessos')); ok(/Não foi possível/.test(txt(w, 'top5')), 'falha no Top 5: mensagem amigável'); w.close();
@@ -314,7 +782,7 @@ async function hub() {
 
 async function rastreio() {
   section('G) Contagem de simulações (rastreio.js dentro do menu)');
-  const w = await open('index.html'); const msgs = []; w.postMessage = (m) => msgs.push(m);
+  const w = await open('index.html'); const msgs = []; w.postMessage = (m) => { if (m && m.tipo === 'simulacao') msgs.push(m); };   // ignora os pedidos de tema que o simulador também envia
   w.document.querySelector('.opt[data-k=indicacao]').click(); await sleep(500); let c = $(w, 'frame').contentWindow;
   const sv = (id, v) => { const e = c.document.getElementById(id); e.value = v; e.dispatchEvent(new c.Event('input', { bubbles: true })); };
   sv('fInd', 100); sv('fInv', 300); await sleep(4400); ok(msgs.length === 1 && msgs[0].ferramenta === 'indicacao' && msgs[0].tipo === 'simulacao', 'indicação: resultado estável por 4s conta 1 simulação', JSON.stringify(msgs));
@@ -331,7 +799,7 @@ async function rastreio() {
 
 (async () => {
   const t0 = Date.now();
-  for (const f of [estatico, indicacao, consumo, consumo2, fatura, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
+  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, mensalidade, celular, correcoes151, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
   console.log('\n' + '='.repeat(60) + `\nAprovados: ${pass}   Reprovados: ${fail}   Avisos: ${warns.length}   (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('\nFALHAS:'); fails.forEach(f => console.log(' x ' + f)); }
   if (warns.length) { console.log('\nAVISOS:'); [...new Set(warns)].forEach(f => console.log(' ! ' + f)); }

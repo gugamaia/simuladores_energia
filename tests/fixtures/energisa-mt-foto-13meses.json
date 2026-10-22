@@ -1,0 +1,62 @@
+{
+ "origem": "Energisa MT - foto da fatura com gráfico de 13 meses; texto transcrito",
+ "texto": "Itens da fatura Unid. Quant. Preço unit c/tributos\nConsumo até 80kWh-BR KWH 80 0,000000 0,00\nConsumo acima de 80kWh-BR KWH 181 0,953120 172,51\nAdic. B Amarela\nLANÇAMENTOS E SERVIÇOS\nContrib de Ilum Pub 27,20\nJUROS DE MORA04/2026 1,63\nMULTA04/2026 3,91\nATUALIZAÇÃO MONETÁRIA04/2026 1,40\nTOTAL: 223,24 13,58 248,03 42,16\nCONSUMO FATURADO Nº DIAS FAT\nJun/26 261 30\nMai/26 286 31\nAbr/26 289 30\nMar/26 277 30\nFev/26 289 31\nJan/26 293 31\nDez/25 264 29\nNov/25 321 32\nOut/25 307 30\nSet/25 266 29\nAgo/25 246 33\nJul/25 239 30\nJun/25 271 31\nMédia 279 30\nMedidor Grandezas Leitura Anterior Leitura Atual Const Medidor Consumo kWh\n00000000000 KWH Total 24285 24546 1 261\nSituação de Débitos FATURAS EM ATRASO Mai/26 R$231,12\nBENEFICIARIO: ENERGISA MATO GROSSO - DISTRIBUIDORA DE ENERGIA S.A.\n",
+ "esperado": {
+  "origem": "Energisa MT - foto da fatura com gráfico de 13 meses; texto transcrito",
+  "distribuidora": "ENERGISA - MT",
+  "tipo": null,
+  "social": false,
+  "atual": null,
+  "meses": [
+   [
+    "JUN/26",
+    261
+   ],
+   [
+    "MAI/26",
+    286
+   ],
+   [
+    "ABR/26",
+    289
+   ],
+   [
+    "MAR/26",
+    277
+   ],
+   [
+    "FEV/26",
+    289
+   ],
+   [
+    "JAN/26",
+    293
+   ],
+   [
+    "DEZ/25",
+    264
+   ],
+   [
+    "NOV/25",
+    321
+   ],
+   [
+    "OUT/25",
+    307
+   ],
+   [
+    "SET/25",
+    266
+   ],
+   [
+    "AGO/25",
+    246
+   ],
+   [
+    "JUL/25",
+    239
+   ]
+  ],
+  "nota": "Tem 13 meses (até JUN/25) e a média 279: usa os 12 mais recentes. Os itens \"JUROS DE MORA04/2026\", \"MULTA04/2026\" etc. não podem virar mês de consumo. O item de consumo vem em faixas escritas \"até 80kWh\" / \"acima de 80kWh\"."
+ }
+}
