@@ -7,10 +7,10 @@
 <meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f161c" media="(prefers-color-scheme: dark)">
 <title>Proposta de oferta - AXS Energia</title>
-<link rel="stylesheet" href="css/tema.css?v=1.5.0">
-<link rel="stylesheet" href="css/proposta.css?v=1.5.0">
-<link rel="stylesheet" href="css/mobile.css?v=1.5.0">
-<script src="js/tema.js?v=1.5.0"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.5.1">
+<link rel="stylesheet" href="css/proposta.css?v=1.5.1">
+<link rel="stylesheet" href="css/mobile.css?v=1.5.1">
+<script src="js/tema.js?v=1.5.1"></script>
 </head>
 <body>
 <header><h1>Proposta de oferta &ndash; AXS Energia</h1></header>
@@ -22,12 +22,12 @@
         <details open>
           <summary>Dados da proposta</summary>
           <label for="pConsultor">Consultor(a)</label>
-          <input type="text" id="pConsultor" placeholder="Nome do consultor(a)">
+          <input type="text" id="pConsultor" maxlength="60" placeholder="Nome do consultor(a)">
           <label for="pCliente">Cliente</label>
-          <input type="text" id="pCliente" placeholder="Nome do cliente">
+          <input type="text" id="pCliente" maxlength="80" placeholder="Nome do cliente">
           <div class="duas">
             <div><label for="pData">Data da proposta</label><input type="date" id="pData"></div>
-            <div><label for="pValidade">Validade da proposta</label><input type="text" id="pValidade" placeholder="dd/mm/aaaa"></div>
+            <div><label for="pValidade">Validade da proposta</label><input type="text" id="pValidade" maxlength="20" placeholder="dd/mm/aaaa"></div>
           </div>
           <label for="pValidadeRapida">Validade r&aacute;pida (a partir da data da proposta)</label>
           <select id="pValidadeRapida">
@@ -37,7 +37,7 @@
             <option value="30">30 dias</option>
           </select>
           <label for="pUC">UC (Unidade Consumidora)</label>
-          <input type="text" id="pUC" placeholder="N&uacute;mero da UC">
+          <input type="text" id="pUC" maxlength="30" placeholder="N&uacute;mero da UC">
         </details>
       </div>
       <div class="card">
@@ -55,12 +55,12 @@
         <details>
           <summary>Textos e benef&iacute;cios</summary>
           <label for="pObs">Observa&ccedil;&atilde;o</label>
-          <textarea id="pObs" rows="7"></textarea>
+          <textarea id="pObs" maxlength="1500" rows="7"></textarea>
           <label for="pCargo">Cargo na assinatura</label>
-          <input type="text" id="pCargo">
-          <label for="pB1">Benef&iacute;cio 1</label><input type="text" id="pB1">
-          <label for="pB2">Benef&iacute;cio 2</label><input type="text" id="pB2">
-          <label for="pB3">Benef&iacute;cio 3</label><input type="text" id="pB3">
+          <input type="text" id="pCargo" maxlength="60">
+          <label for="pB1">Benef&iacute;cio 1</label><input type="text" id="pB1" maxlength="40">
+          <label for="pB2">Benef&iacute;cio 2</label><input type="text" id="pB2" maxlength="40">
+          <label for="pB3">Benef&iacute;cio 3</label><input type="text" id="pB3" maxlength="40">
           <p class="legend">Deixe um benef&iacute;cio em branco para ocult&aacute;-lo.</p>
         </details>
       </div>
@@ -111,8 +111,8 @@
 </main>
 <script src="js/vendor/html2canvas.min.js"></script>
 <script src="js/vendor/jspdf.umd.min.js"></script>
-<script src="js/proposta-imagens.js?v=1.5.0"></script>
-<script src="js/proposta.js?v=1.5.0"></script>
-<script src="js/altura.js?v=1.5.0"></script>
+<script src="js/proposta-imagens.js?v=1.5.1"></script>
+<script src="js/proposta.js?v=1.5.1"></script>
+<script src="js/altura.js?v=1.5.1"></script>
 </body>
 </html>

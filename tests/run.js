@@ -114,7 +114,7 @@ async function indicacao() {
   r = run(100, 300, 0, 100); ok(/Crédito não zera/.test(txt(w, 'out')) && num(r[2]['Paga no 1º mês']) === 100, 'desconto 0%: sem crédito');
   r = run(100, 300, 50, 0); ok(num(r[2]['Paga no 1º mês']) === 100, 'crédito 0%: indicador paga cheio');
   r = run(100, 300, 50, 50); ok(num(r[2]['Paga no 1º mês']) === 25, 'crédito 50% do desconto (75): paga 25', JSON.stringify(r[2]));
-  r = run(0.01, 1000); ok(txt(w, 'out').includes('isenta por'), 'fatura mínima 0,01 não quebra');
+  r = run(0.01, 1000); ok(/entre R\$ 1,00 e R\$ 10\.000\.000,00/.test(txt(w, 'out')), 'fatura abaixo de R$ 1,00 é recusada com aviso (não trava)');
   r = run(33.33, 99.99); ok(!/NaN|Infinity/.test(txt(w, 'out')), 'centavos sem NaN/Infinity');
   ['', '0', '-5', 'abc'].forEach(v => { run(100, v); ok(/Preencha/.test(txt(w, 'out')), 'fatura inválida "' + v + '" não calcula'); });
   setv(w, 'fInd', 100); setv(w, 'fInv', 300); setv(w, 'pInv', ''); ok(/Preencha|Informe/.test(txt(w, 'out')), 'percentual vazio não calcula');
@@ -671,6 +671,71 @@ async function celular() {
   const solo = await open('indicacao.html'); const m2 = []; solo.postMessage = m => m2.push(m); solo.document.body.getBoundingClientRect = () => ({ height: 500 }); solo.dispatchEvent(new solo.Event('resize')); await sleep(50); ok(!m2.length, 'fora do menu o simulador não envia altura'); solo.close();
 }
 
+/* ======================= O) CORREÇÕES DA 1.5.1 (QA de estresse) ======================= */
+async function correcoes151() {
+  section('O) Correções da 1.5.1: travamento da indicação, rótulos, limites, leitura de fatura e menu');
+  const lerS = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  // E-01 indicação
+  let w = await open('indicacao.html'); const tempo = (fn) => { const t = Date.now(); fn(); return Date.now() - t; };
+  ok(!/plan\.push|let plan/.test(lerS('js/indicacao.js')), 'indicação: o laço que montava o plano mês a mês foi removido');
+  ok($(w, 'fInd').min === '1' && $(w, 'fInd').max === '10000000' && $(w, 'fInv').min === '1' && $(w, 'fInv').max === '10000000', 'indicação: campos de fatura com mínimo R$ 1 e máximo R$ 10.000.000');
+  for (const [a, b] of [[0.01, 1000000], [1e308, 1e308], [0.5, 100], [10000000.01, 100], [100, 10000001], [1e305, 100]]) {
+    const ms = tempo(() => { setv(w, 'pInv', 100); setv(w, 'pInd', 100); setv(w, 'fInv', 100); setv(w, 'fInd', 100); $(w, 'fInd').value = String(a); $(w, 'fInv').value = String(b); $(w, 'fInv').dispatchEvent(new w.Event('input', { bubbles: true })); });
+    ok(/entre R\$ 1,00 e R\$ 10\.000\.000,00/.test(txt(w, 'out')) && ms < 500, `indicação: fatura ${a} x ${b} é recusada com aviso, sem travar (${ms} ms)`);
+  }
+  setv(w, 'fInd', 1); setv(w, 'fInv', 1); setv(w, 'pInv', 100); setv(w, 'pInd', 100); ok(/isenta por 1 mês/.test(txt(w, 'out')), 'indicação: R$ 1,00 e R$ 1,00 (limite mínimo) calcula');
+  let ms = tempo(() => { setv(w, 'fInv', 10000000); setv(w, 'fInd', 1); });
+  ok(ms < 500 && /isenta por 10000000 meses/.test(txt(w, 'out')) && /cobre 10\.000\.000 meses \(mais de 10 anos\)/.test(txt(w, 'out')), `indicação: razão máxima (R$ 1 contra R$ 10 milhões) termina em ${ms} ms e avisa para conferir`, txt(w, 'out').slice(0, 120));
+  setv(w, 'fInd', 100); setv(w, 'fInv', 12000); ok(!/mais de 10 anos/.test(txt(w, 'out')) && /isenta por 120 meses/.test(txt(w, 'out')), 'indicação: 120 meses exatos não gera aviso');
+  setv(w, 'fInv', 12100); ok(/isenta por 121 meses/.test(txt(w, 'out')) && /mais de 10 anos/.test(txt(w, 'out')), 'indicação: 121 meses gera aviso'); w.close();
+  // E-04 rótulos, E-02/E-07/E-11/E-12 limites no consumo
+  w = await open('consumo.html'); const d = w.document;
+  const nome = e => (e.getAttribute('aria-label') || (e.id && (d.querySelector('label[for="' + e.id + '"]') || {}).textContent) || (e.closest('label') || {}).textContent || e.getAttribute('title') || (e.tagName === 'BUTTON' ? e.textContent : '') || '').trim();
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [300, 300]);
+  const qa = (i, n) => { const e = d.querySelectorAll('.acq')[i]; e.value = n; e.dispatchEvent(new w.Event('input', { bubbles: true })); }; qa(0, 2);
+  setv(w, 'oNome', 'Chuveiro'); setv(w, 'oKwh', 80); $(w, 'oAdd').click(); setv(w, 'nNome', 'CELESC - SC'); setv(w, 'nMono', 1); setv(w, 'nBi', 1); setv(w, 'nTri', 1); $(w, 'add').click();
+  const sem = [...d.querySelectorAll('input:not([type=hidden]),select,textarea,button')].filter(e => !nome(e)).map(e => (e.id || e.className || e.tagName) + (e.dataset.d ? '@' + e.dataset.d : ''));
+  ok(sem.length === 0, 'consumo: todos os campos e botões têm nome acessível (antes: 51 sem rótulo)', sem.slice(0, 5).join(', '));
+  ok([...d.querySelectorAll('th')].every(t => t.textContent.trim().length > 0), 'consumo: nenhum cabeçalho de tabela vazio');
+  ok(/9\.000 BTUs/.test(d.querySelector('.acq').getAttribute('aria-label')) && /9\.000 BTUs \(kWh/.test(d.querySelector('.ack').getAttribute('aria-label')), 'rótulos do ar-condicionado dizem o modelo');
+  ok(d.querySelector('#params input[data-k="Monofásico"]').getAttribute('aria-label') === 'CEMIG - MG, Monofásico: consumo mínimo em kWh', 'rótulo dos parâmetros: distribuidora, tipo e unidade');
+  ok(d.querySelector('#tarifas input[data-b="Verde"]').getAttribute('aria-label') === 'Tarifa AXS CEMIG - MG, bandeira Verde (R$/kWh)' && /Faixa II, bandeira Amarela/.test(d.querySelector('#tarifas tr[data-f="Faixa II"] input[data-b="Amarela"]').getAttribute('aria-label')), 'rótulo das tarifas: distribuidora, faixa e bandeira');
+  ok(d.querySelector('.oq').getAttribute('aria-label') === 'Quantidade de Chuveiro' && d.querySelector('[data-del]').getAttribute('aria-label') === 'Remover Chuveiro', 'rótulo dos produtos: quantidade e remover pelo nome');
+  // limites
+  const al = () => w.__alerts || 0; let a0 = al(); setv(w, 'oNome', 'x'.repeat(100)); setv(w, 'oKwh', 10); $(w, 'oAdd').click(); ok(d.querySelectorAll('.orow:not(.ohead)')[1].children[0].textContent.length === 60, 'produto: nome cortado em 60 caracteres');
+  setv(w, 'oNome', 'Forno'); setv(w, 'oKwh', 100001); $(w, 'oAdd').click(); ok(al() === a0 + 1, 'produto: consumo acima de 100.000 kWh é recusado');
+  setv(w, 'oKwh', 10); setv(w, 'oQtd', 1001); $(w, 'oAdd').click(); ok(al() === a0 + 2, 'produto: quantidade acima de 1.000 é recusada');
+  setv(w, 'oQtd', 1); for (let i = 0; i < 60; i++) { setv(w, 'oNome', 'P' + i); setv(w, 'oKwh', 1); $(w, 'oAdd').click(); }
+  ok(d.querySelectorAll('.orow:not(.ohead)').length === 50 && al() >= a0 + 2 + 10, 'produtos: no máximo 50 por simulação, os demais são recusados com aviso', String(d.querySelectorAll('.orow:not(.ohead)').length));
+  setv(w, 'nNome', 'D'.repeat(100)); setv(w, 'nMono', 1); setv(w, 'nBi', 1); setv(w, 'nTri', 1); $(w, 'add').click(); ok([...$(w, 'dist').options].some(o => o.value === 'D'.repeat(40)) && ![...$(w, 'dist').options].some(o => o.value.length > 40), 'distribuidora: nome cortado em 40 caracteres');
+  ok($(w, 'oNome').maxLength === 60 && $(w, 'nNome').maxLength === 40 && $(w, 'oKwh').max === '100000' && $(w, 'oQtd').max === '1000', 'campos de produto e distribuidora com os limites no HTML');
+  base(w, 'ENERGISA - MT', 'Bifásico'); meses(w, [1000000, 1000001, -1, 'abc', 300]);
+  ok(txt(w, 'qtd') === '2' && d.getElementById('m1').getAttribute('aria-invalid') === 'false' && d.getElementById('m2').getAttribute('aria-invalid') === 'true' && d.getElementById('m3').getAttribute('aria-invalid') === 'true' && d.getElementById('m5').getAttribute('aria-invalid') === 'false', 'meses: 0 a 1.000.000 kWh valem; acima, negativo ou texto é ignorado e marcado como inválido', txt(w, 'qtd'));
+  ok(d.getElementById('m1').max === '1000000', 'campos de mês com máximo de 1.000.000 no HTML');
+  // E-05 leitura de fatura contra textos hostis (cada um precisa terminar em menos de 1,5 s)
+  const hostis = { 'JAN + 200.000 espaços': 'JAN' + ' '.repeat(200000) + 'x', '"JAN26 " x 100.000': 'JAN26 '.repeat(100000), '"1 " x 300.000': '1 '.repeat(300000), '"JAN/26 345 " x 50.000': 'JAN/26 345 '.repeat(50000), '"/-. " x 500.000': '/-. '.repeat(500000), '"JAN 26 " x 100.000': 'JAN 26 '.repeat(100000), 'linha única de 1 MB': 'JAN26 345 '.repeat(100000), 'texto de 3 MB': 'ENERGIA CONSUMO 12 '.repeat(160000) };
+  for (const [n, tx] of Object.entries(hostis)) { const m = tempo(() => w.analisarFatura(tx)); ok(m < 1500, `leitura de fatura: ${n} em ${m} ms (antes: até 88 s)`); }
+  const bl = w.blocoMesesValores('X JAN26 DEZ25 NOV25 OUT25 SET25 161 223 115 145 70 31 32 Y'); ok(bl && bl.rot.length === 5 && bl.nums.join() === '161,223,115,145,70', 'bloco de meses e valores é encontrado (formato Copel)');
+  ok(w.blocoMesesValores('JAN 26 DEZ/25 NOV-25 OUT25 SET.25 1 2 3 4 5') && w.blocoMesesValores('JAN26 DEZ25 NOV25 OUT25 1 2 3 4 5') === null && w.blocoMesesValores('JAN26 DEZ25 NOV25 OUT25 SET25 1 2 3 4') === null, 'bloco: aceita "JAN 26", "DEZ/25", "NOV-25"; exige 5 meses e valores suficientes');
+  ok(w.analisarFatura('A'.repeat(1000000)).meses.length === 0, 'texto de 1 MB sem conteúdo útil é tratado e limitado');
+  w.close();
+  // E-09/E-13 menu
+  let h = await open('index.html'); const dd = h.document;
+  ok(dd.querySelectorAll('main').length === 1 && dd.querySelector('main#conteudo #menu') && dd.querySelector('main#conteudo #tool') && dd.querySelector('main#conteudo').getAttribute('tabindex') === '-1', 'menu: uma região principal (main) com o menu e a tela dentro');
+  const foc = [...dd.querySelectorAll('a[href],button,input,select')][0]; ok(foc.classList.contains('pular') && foc.getAttribute('href') === '#conteudo' && /Pular para o conteúdo/.test(foc.textContent), 'menu: o primeiro item do teclado é "Pular para o conteúdo"');
+  const hash0 = h.location.hash; foc.click(); ok(h.location.hash === hash0 && dd.activeElement.id === 'conteudo', 'pular para o conteúdo move o foco sem mudar o endereço (que escolhe a tela)'); h.close();
+  const ic = lerS('css/index.css'); ok(!/@media\(max-width:900px\)\{#nav\{grid-template-columns:1fr auto\}/.test(ic), 'menu: removida a regra que fazia a barra rolar entre 721 e 900 px (aba cortada)');
+  ok(/@media\(min-width:721px\) and \(max-width:1260px\)\{[^}]*#nav \.nav-links a\{font-size:0;[^}]*\}[^}]*attr\(data-ic\)[^}]*\}[^}]*attr\(data-curto\)/.test(ic), 'menu: de 721 a 1.260 px a barra usa ícone + rótulo curto numa linha só');
+  ok(/@media\(max-width:340px\)\{\.nav-esq\{display:none\}/.test(ic), 'menu: abaixo de 340 px ficam só a chave e a versão');
+  ok(/\.pular:focus\{top:8px\}/.test(ic), 'menu: o link de pular aparece ao receber o foco');
+  const pc = lerS('css/proposta.css'), ph = lerS('proposta.html');
+  ok([['pConsultor', 60], ['pCliente', 80], ['pUC', 30], ['pValidade', 20], ['pCargo', 60], ['pB1', 40], ['pB2', 40], ['pB3', 40], ['pObs', 1500]].every(([id, n]) => new RegExp('id="' + id + '" maxlength="' + n + '"').test(ph)), 'proposta: limites de tamanho em todos os campos de texto');
+  ok(/\.px-signature-name[^{]*\{[^}]*overflow-wrap:anywhere/.test(pc), 'proposta: assinatura, cargo, benefícios e cartões quebram palavras longas');
+  ok(/\.duas>\*\{min-width:0\}/.test(lerS('css/proposta.css')) && /@media\(max-width:340px\)\{\.duas\{grid-template-columns:minmax\(0,1fr\)\}\}/.test(lerS('css/proposta.css')), 'proposta: data e validade em uma coluna abaixo de 340 px');
+  ok(/\.scroll\{position:relative\}/.test(lerS('css/consumo.css')), 'css: o bloco de rolagem das tabelas contém o texto invisível (.sr-only), sem alargar a página em 280 px');
+  ok(/\.orow>\*,\.acrow>\*\{min-width:0\}/.test(lerS('css/consumo.css')) && /\.addrow>\*,\.oadd>\*\{min-width:0\}/.test(lerS('css/consumo.css')) && /@media\(max-width:480px\)\{\s*\.addrow\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/.test(lerS('css/consumo.css')) && /\.layout\{grid-template-columns:minmax\(0,1fr\)\}\.col-b\{order:1\}/.test(lerS('css/consumo.css')) && /\.col-a,\.col-b,\.col-c\{min-width:0\}/.test(lerS('css/consumo.css')) && /\.sr-only\{/.test(lerS('css/mobile.css')), 'css: coluna única do celular com minmax(0,1fr) (tabelas rolam no cartão), formulários de adicionar e linhas de produto/AC encolhem; classe .sr-only');
+}
+
 /* ======================= F) MENU/HUB, ESTATÍSTICAS E RASTREIO ======================= */
 async function hub() {
   section('F) Menu, navegação, estatísticas e contagem');
@@ -734,7 +799,7 @@ async function rastreio() {
 
 (async () => {
   const t0 = Date.now();
-  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, mensalidade, celular, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
+  for (const f of [estatico, indicacao, consumo, consumo2, fatura, faturasReais, tema, proposta, layoutConsumo, energiaCompartilhada, mensalidade, celular, correcoes151, hub, rastreio]) { try { await f(); } catch (e) { fail++; fails.push('ERRO NA SUÍTE ' + f.name + ': ' + (e.stack || e).toString().split('\n').slice(0, 3).join(' | ')); } }
   console.log('\n' + '='.repeat(60) + `\nAprovados: ${pass}   Reprovados: ${fail}   Avisos: ${warns.length}   (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   if (fails.length) { console.log('\nFALHAS:'); fails.forEach(f => console.log(' x ' + f)); }
   if (warns.length) { console.log('\nAVISOS:'); [...new Set(warns)].forEach(f => console.log(' ! ' + f)); }

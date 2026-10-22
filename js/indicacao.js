@@ -1,7 +1,10 @@
 const $ = id => document.getElementById(id);
 const brl = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const r2 = v => Math.round(v*100)/100;
+const r2 = v => Math.round(v*100 + 1e-6)/100;   // meio centavo sobe (evita erro de ponto flutuante: 8,745 virava 8,74)
 const plural = (n,s,p) => n + ' ' + (n===1?s:p);
+
+/* limites de entrada: evitam valores absurdos e resultados sem sentido */
+const MIN_FATURA = 1, MAX_FATURA = 10000000, MAX_MESES = 120;
 
 function calc(){
   const fInd = parseFloat($('fInd').value), fInv = parseFloat($('fInv').value);
@@ -9,6 +12,9 @@ function calc(){
   const out = $('out');
   if(!(fInd>0) || !(fInv>0) || isNaN(pInv) || isNaN(pInd)){
     out.innerHTML = '<p class="empty">Preencha as duas faturas para simular.</p>'; return;
+  }
+  if(fInd < MIN_FATURA || fInd > MAX_FATURA || fInv < MIN_FATURA || fInv > MAX_FATURA){
+    out.innerHTML = '<p class="empty">Informe faturas entre R$ 1,00 e R$ 10.000.000,00.</p>'; return;
   }
   if(pInv<0 || pInv>100 || pInd<0 || pInd>100){
     out.innerHTML = '<p class="empty">Informe percentuais entre 0 e 100.</p>'; return;
@@ -29,10 +35,8 @@ function calc(){
     <div class="row"><span>Fatura mensal</span><b>${brl(fInd)}</b></div>
     <div class="row"><span>Crédito recebido</span><b>${brl(credito)}</b></div>`;
 
-  let plan = [];
   if(credito < fInd){
     const paga = r2(fInd - credito);
-    plan.push({m:1,desc:credito,paga});
     html += `</section>
     <section class="card hl">
       <p class="big">Crédito não zera a fatura</p>
@@ -41,15 +45,16 @@ function calc(){
       <div class="row"><span>A partir do 2º mês</span><b>${brl(fInd)}</b></div>
     </section>`;
   } else {
-    const cheios = Math.floor(r2(credito / fInd) + 1e-9);
-    const resto = r2(credito - cheios*fInd);
-    const paga = resto>0 ? r2(fInd - resto) : fInd;
-    for(let i=1;i<=cheios;i++) plan.push({m:i,desc:fInd,paga:0});
+    // contas em centavos inteiros: arredondar a razão (crédito / fatura) antes de truncar contava 1 mês a mais em ~0,2% dos casos
+    const cC = Math.round(credito*100), iC = Math.round(fInd*100);
+    const cheios = Math.floor(cC / iC), restoC = cC - cheios*iC;
+    const resto = restoC/100;
+    const paga = restoC>0 ? (iC - restoC)/100 : fInd;
     const voltaMes = cheios+1;
-    plan.push({m:voltaMes,desc:resto,paga});
     html += `</section>
     <section class="card hl">
       <p class="big">Fatura isenta por ${plural(cheios,'mês','meses')}</p>
+      ${cheios > MAX_MESES ? '<p class="aviso">⚠ Confira os valores: o crédito cobre ' + cheios.toLocaleString('pt-BR') + ' meses (mais de 10 anos).</p>' : ''}
       <div class="row"><span>Meses 1 a ${cheios} (isentos)</span><b>${brl(0)}</b></div>
       <div class="row"><span>Volta a pagar no mês ${voltaMes}</span><b>${brl(paga)}</b></div>
       <div class="row"><span>${resto>0?'Saldo de crédito usado nesse mês':'Sem saldo de crédito restante'}</span><b>${resto>0?'− '+brl(resto):brl(0)}</b></div>

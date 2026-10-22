@@ -10,6 +10,26 @@ Ideias já mapeadas para as próximas versões:
 - Pedir confirmação quando a distribuidora for identificada só pela primeira palavra do nome (ex.: CPFL Piratininga).
 - Considerar os dias de faturamento de cada mês na média (a confirmar com o negócio).
 
+## [1.5.1] - 2026-10-11
+Correções encontradas no QA de estresse (`QA-ESTRESSE.md`). Validada por 734 testes automatizados e 266 verificações em Chromium real; a varredura de layout (25 larguras de 280 a 2.560 px x 4 telas) e os 12 cenários extremos da proposta ficaram sem nenhum problema.
+
+### Corrigido
+- **Indicação (E-01):** valores extremos (fatura de R$ 0,01 contra R$ 1 milhão, ou de 1e308) **travavam e derrubavam a aba**. Foi removido o laço que montava o plano mês a mês (sobra de uma tabela antiga), as faturas passaram a aceitar de **R$ 1,00 a R$ 10.000.000,00** e, quando o crédito cobre mais de 120 meses, aparece um aviso para conferir os valores.
+- **Consumo no celular (E-02):** com o cartão "Parâmetros de atendimento" aberto, a página passava a rolar na horizontal em telas de 320 a 540 px, porque as tabelas largas (parâmetros e tarifas) esticavam a coluna única do celular. Agora a coluna tem largura fixa e as tabelas rolam dentro do cartão; os formulários de adicionar distribuidora e produto, e as linhas de produto e de ar-condicionado, também encolhem.
+- **Menu em tablets e notebooks pequenos (E-03, E-06):** a barra superior estourava a 1.024 px e, entre 768 e 900 px, a aba Proposta ficava fora da tela. Entre 721 e 1.260 px a barra usa rótulos curtos com ícone, numa linha só, com as 4 abas visíveis.
+- **Telas de 280 px (E-10):** a barra superior estourava no Galaxy Z Fold fechado; abaixo de 340 px ficam só a chave de tema e a versão.
+- **Acessibilidade (E-04, E-09, E-13):** os 51 campos do consumo sem rótulo (ar-condicionado, produtos, parâmetros e tarifas) ganharam nome para leitores de tela; o menu ganhou a região principal (`main`) e o link "Pular para o conteúdo"; o cabeçalho vazio da tabela de parâmetros ganhou texto.
+- **Indicação, arredondamento:** a razão crédito/fatura era arredondada antes de contar os meses cheios e, em cerca de 0,2% dos casos, a tela mostrava 1 mês de isenção a mais; e valores de meio centavo (como R$ 8,745) caíam para baixo por erro de ponto flutuante. Agora as contas são em centavos inteiros e 3.000 casos aleatórios batem com o cálculo exato.
+- **Leitura de fatura (E-05):** textos enormes ou malformados (por exemplo, 100.000 vezes "JAN26") **travavam a página por mais de um minuto**. A busca de blocos de meses passou a ser linear e o texto lido tem limite de tamanho.
+- **Proposta em 280 px:** o campo de validade estourava a largura; abaixo de 340 px data e validade ficam em uma coluna.
+- **Proposta (E-07):** nome do consultor longo e sem espaços estourava a assinatura. Os campos ganharam limite de tamanho e o texto quebra dentro da folha.
+
+### Alterado
+- **Limites de entrada (E-11, E-12):** consumo mensal de 0 a 1.000.000 kWh (fora disso é ignorado e marcado em vermelho); produtos com até 60 caracteres, 100.000 kWh e 1.000 unidades, no máximo 50 por simulação; nome de distribuidora com até 40 caracteres.
+
+### Não alterado (decisão pendente)
+- **E-08:** o verde da marca na proposta (contraste de 2,5:1). Mantido para preservar a identidade visual; veja `QA-ESTRESSE.md`.
+
 ## [1.5.0] - 2026-10-08
 Visualização e navegação para celular. Validada por 681 testes automatizados e 232 verificações em Chromium real, em 5 perfis de aparelho.
 

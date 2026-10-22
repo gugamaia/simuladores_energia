@@ -60,7 +60,7 @@ const fmt = v => v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFracti
 
 // montar selects, meses e tabela
 let mh = '';
-for(let i=1;i<=12;i++){const n=String(i).padStart(2,'0'); mh += `<div><label for="m${i}">Mês ${n}</label><input type="number" id="m${i}" class="mes" min="0" step="1" inputmode="decimal"></div>`;}
+for(let i=1;i<=12;i++){const n=String(i).padStart(2,'0'); mh += `<div><label for="m${i}">Mês ${n}</label><input type="number" id="m${i}" class="mes" min="0" max="1000000" step="1" inputmode="decimal"></div>`;}
 $('months').innerHTML = mh;
 
 function renderDist(){
@@ -71,8 +71,8 @@ function renderDist(){
 function renderParams(){
   $('params').innerHTML = Object.entries(PARAMS).map(([d,t])=>
     `<tr data-d="${esc(d)}"><td>${esc(d)}</td>` +
-    TIPOS.map(k=>`<td><input type="number" min="0" step="1" data-k="${k}" value="${t[k]}"></td>`).join('') +
-    `<td><button type="button" class="x" title="Remover" data-del="1">×</button></td></tr>`).join('');
+    TIPOS.map(k=>`<td><input type="number" min="0" step="1" data-k="${k}" value="${t[k]}" aria-label="${esc(d)}, ${k}: consumo mínimo em kWh"></td>`).join('') +
+    `<td><button type="button" class="x" title="Remover" aria-label="Remover ${esc(d)}" data-del="1">×</button></td></tr>`).join('');
 }
 function refresh(){ salvar(); renderDist(); renderParams(); calc(); }
 $('params').addEventListener('input',e=>{
@@ -86,7 +86,7 @@ $('params').addEventListener('click',e=>{
   if(confirm('Remover '+d+'?')){ delete PARAMS[d]; refresh(); }
 });
 $('add').addEventListener('click',()=>{
-  const nome=$('nNome').value.trim(), v=['nMono','nBi','nTri'].map(id=>parseFloat($(id).value));
+  const nome=$('nNome').value.trim().slice(0,40), v=['nMono','nBi','nTri'].map(id=>parseFloat($(id).value));
   if(!nome || v.some(x=>isNaN(x)||x<0)){ alert('Informe o nome e os três mínimos.'); return; }
   PARAMS[nome]={"Monofásico":v[0],"Bifásico":v[1],"Trifásico":v[2]};
   ['nNome','nMono','nBi','nTri'].forEach(id=>$(id).value='');
@@ -130,7 +130,7 @@ function renderTarifas(){
     fx.forEach(f=>{
       const lin = f ? TARIFAS[d][f] : TARIFAS[d];
       linhas.push('<tr data-d="'+esc(d)+'"'+(f ? ' data-f="'+esc(f)+'"' : '')+'><td>'+esc(d)+(f ? ' · '+esc(f) : '')+'</td>'
-        + BANDEIRAS.map(b=>'<td><input type="number" min="0" step="0.00001" data-b="'+esc(b)+'" value="'+lin[b]+'"></td>').join('')+'</tr>');
+        + BANDEIRAS.map(b=>'<td><input type="number" min="0" step="0.00001" data-b="'+esc(b)+'" value="'+lin[b]+'" aria-label="Tarifa AXS '+esc(d)+(f ? ' '+esc(f) : '')+', bandeira '+esc(b)+' (R$/kWh)"></td>').join('')+'</tr>');
     });
   });
   $('tarifas').innerHTML = linhas.join('');
@@ -158,7 +158,8 @@ renderDist(); renderParams();
 
 function calc(){
   const meses = [...document.querySelectorAll('.mes')].map((inp,idx)=>({idx,raw:inp.value.trim()}))
-    .filter(m=>m.raw!=='' && !isNaN(m.raw) && Number(m.raw)>=0).map(m=>({idx:m.idx,v:Number(m.raw)}));
+    .filter(m=>m.raw!=='' && !isNaN(m.raw) && Number(m.raw)>=0 && Number(m.raw)<=1000000).map(m=>({idx:m.idx,v:Number(m.raw)}));
+  document.querySelectorAll('.mes').forEach(inp=>{ const v = inp.value.trim(); inp.setAttribute('aria-invalid', (v !== '' && !(Number(v) >= 0 && Number(v) <= 1000000)) ? 'true' : 'false'); });   // fora de 0 a 1.000.000 kWh: ignorado e marcado
   const mediaTodos = meses.length ? meses.reduce((a,m)=>a+m.v,0)/meses.length : null;
   const limite = (parseFloat($('limiar').value) || 30)/100;
   const outliers = (meses.length>=3 && mediaTodos>0) ? meses.filter(m=>Math.abs(m.v-mediaTodos)/mediaTodos > limite) : [];
@@ -255,8 +256,8 @@ try{
 function renderAC(){
   $('acs').innerHTML = AC.map((a,i)=>
     `<div class="acrow"><span>${a.btu.toLocaleString('pt-BR')} BTUs</span>` +
-    `<input type="number" class="ack" data-i="${i}" min="0" step="1" value="${a.kwh}">` +
-    `<input type="number" class="acq" data-i="${i}" min="0" step="1" placeholder="0"></div>`).join('');
+    `<input type="number" class="ack" data-i="${i}" min="0" step="1" value="${a.kwh}" aria-label="Consumo extra por aparelho de ${a.btu.toLocaleString('pt-BR')} BTUs (kWh por mês)">` +
+    `<input type="number" class="acq" data-i="${i}" min="0" step="1" placeholder="0" aria-label="Quantidade de aparelhos de ${a.btu.toLocaleString('pt-BR')} BTUs"></div>`).join('');
 }
 function acExtra(){
   let t = 0;
@@ -296,7 +297,7 @@ let OUTROS = [];
 function renderOutros(){
   $('outros').innerHTML = OUTROS.length
     ? '<div class="orow ohead"><span>Produto</span><span>kWh/mês</span><span>Qtd</span><span>Total</span><span></span></div>' +
-      OUTROS.map((o,i)=>`<div class="orow"><span>${esc(o.nome)}</span><span>${fmt(o.kwh)}</span><input type="number" class="oq" data-i="${i}" min="1" step="1" value="${o.qtd}"><b>${fmt(o.kwh*o.qtd)}</b><button type="button" class="x" data-del="${i}" title="Remover">×</button></div>`).join('')
+      OUTROS.map((o,i)=>`<div class="orow"><span>${esc(o.nome)}</span><span>${fmt(o.kwh)}</span><input type="number" class="oq" data-i="${i}" aria-label="Quantidade de ${esc(o.nome)}" min="1" step="1" value="${o.qtd}"><b>${fmt(o.kwh*o.qtd)}</b><button type="button" class="x" data-del="${i}" aria-label="Remover ${esc(o.nome)}" title="Remover">×</button></div>`).join('')
     : '<p class="legend">Nenhum produto adicionado.</p>';
 }
 function outrosExtra(){ return OUTROS.reduce((t,o)=>t+o.kwh*o.qtd,0); }
@@ -310,8 +311,9 @@ $('outros').addEventListener('click',e=>{
   OUTROS.splice(parseInt(e.target.dataset.del,10),1); renderOutros(); calc();
 });
 $('oAdd').addEventListener('click',()=>{
-  const nome=$('oNome').value.trim(), kwh=parseFloat($('oKwh').value), qtd=parseInt($('oQtd').value,10)||1;
-  if(!nome || isNaN(kwh) || kwh<0 || qtd<1){ alert('Informe o produto e o consumo mensal (kWh).'); return; }
+  if(OUTROS.length >= 50){ alert('Limite de 50 produtos por simulação.'); return; }
+  const nome=$('oNome').value.trim().slice(0,60), kwh=parseFloat($('oKwh').value), qtd=parseInt($('oQtd').value,10)||1;
+  if(!nome || isNaN(kwh) || kwh<0 || kwh>100000 || qtd<1 || qtd>1000){ alert('Informe o produto (até 60 caracteres), o consumo mensal (0 a 100.000 kWh) e a quantidade (1 a 1.000).'); return; }
   OUTROS.push({nome,kwh,qtd});
   ['oNome','oKwh','oQtd'].forEach(id=>$(id).value='');
   renderOutros(); calc();
@@ -349,7 +351,26 @@ const ROT = Object.keys(MESES);
 const brNum = t => parseFloat(String(t).replace(/\./g,'').replace(',','.'));
 const semAcento = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
+/* Procura um bloco de rótulos de mês seguido dos valores na mesma ordem (ex.: JAN26 DEZ25 ... 161 223 ...).
+   Percorre as palavras uma vez (tempo linear): uma regex aninhada travava a página com textos grandes. */
+function blocoMesesValores(T){
+  const MM = '(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)';
+  const tk = T.replace(new RegExp('\\b'+MM+' (?=\\d{2,4}\\b)','g'),'$1').replace(new RegExp('\\b'+MM+'[\\/\\-.](?=\\d{2,4}\\b)','g'),'$1').split(' ');
+  const reM = new RegExp('^'+MM+'(\\d{2,4})$'), reN = /^\d{1,5}(?:[.,]\d+)?$/;
+  for(let i=0;i<tk.length;){
+    if(!reM.test(tk[i])){ i++; continue; }
+    let j = i; while(j<tk.length && reM.test(tk[j])) j++;
+    const n = j - i;
+    if(n >= 5){
+      let k = j; while(k<tk.length && reN.test(tk[k])) k++;
+      if(k - j >= n) return { rot: tk.slice(i,j).map(x=>x.match(reM)), nums: tk.slice(j,j+n) };
+    }
+    i = j;
+  }
+  return null;
+}
 function analisarFatura(txt){
+  if(txt.length > 400000) txt = txt.slice(0, 400000);   // limite de segurança: texto enorme não trava a página
   const T = semAcento(txt).toUpperCase().replace(/\s+/g,' ');
   const r = {};
   // distribuidora: a que aparece primeiro no texto
@@ -368,19 +389,15 @@ function analisarFatura(txt){
   const hist = new Map();
   let estrito = false;
   const add = (a,m,v)=>{ if(estrito && /[.,]/.test(v)) return; if(a<100) a+=2000; const k=a*12+m; if(!hist.has(k)) hist.set(k,{rot:ROT[m-1]+'/'+String(a).slice(2),v:brNum(v)}); };
-  const reA = /\b(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*[\/\-.]?\s*(\d{2,4})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
+  const reA = /\b(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s{0,2}[\/\-.]?\s{0,2}(\d{2,4})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
   const reB = /(?<![A-Z\/\d])(0[1-9]|1[0-2])\s*\/\s*(20\d{2})\s+(\d{1,5}(?:[.,]\d+)?)\b(?!\/)/g;
   const scan = t=>{ for(const m of t.matchAll(reA)) add(+m[2],MESES[m[1]],m[3]); for(const m of t.matchAll(reB)) add(+m[2],+m[1],m[3]); };
-  semAcento(txt).toUpperCase().split('\n').forEach(scan);
+  semAcento(txt).toUpperCase().split('\n').filter(l=>l.length<=3000).forEach(scan);
   if(hist.size<3){
     // rótulos em bloco seguidos dos valores na mesma ordem (ex.: JAN26 DEZ25 ... 161 223 ...)
     const n0 = hist.size;
-    const mm = T.match(/((?:(?:JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*[\/\-.]?\s*\d{2,4}\s+){5,})((?:\d{1,5}(?:[.,]\d+)?\s+){5,})/);
-    if(mm){
-      const rot = [...mm[1].matchAll(/(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*[\/\-.]?\s*(\d{2,4})/g)];
-      const nums = mm[2].trim().split(/\s+/);
-      if(nums.length>=rot.length) rot.forEach((m,i)=>add(+m[2],MESES[m[1]],nums[i]));
-    }
+    const bl = blocoMesesValores(T);
+    if(bl) bl.rot.forEach((m,k)=>add(+m[2],MESES[m[1]],bl.nums[k]));
     if(hist.size===n0){ estrito = true; scan(T); estrito = false; }
   }
   r.meses = [...hist.entries()].sort((a,b)=>b[0]-a[0]).slice(0,12).map(e=>e[1]);

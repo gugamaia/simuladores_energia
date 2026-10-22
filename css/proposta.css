@@ -54,3 +54,9 @@ textarea{resize:vertical}
 .px-benefit:empty{display:none}
 .px-banner{width:100%;background:#061532}
 .px-banner img{width:100%;display:block;height:auto}
+/* textos longos sem espaço não podem estourar a folha */
+.px-signature-name,#vCargo,.px-benefit,.px-card-title,.px-card-value,.px-signature{overflow-wrap:anywhere}
+/* data e validade lado a lado só quando cabem (em 280 px o campo de data estourava) */
+.duas{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.duas>*{min-width:0}
+@media(max-width:340px){.duas{grid-template-columns:minmax(0,1fr)}}

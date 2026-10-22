@@ -7,10 +7,10 @@
 <meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f161c" media="(prefers-color-scheme: dark)">
 <title>Simulador de desconto por indicação</title>
-<link rel="stylesheet" href="css/tema.css?v=1.5.0">
-<link rel="stylesheet" href="css/indicacao.css?v=1.5.0">
-<link rel="stylesheet" href="css/mobile.css?v=1.5.0">
-<script src="js/tema.js?v=1.5.0"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.5.1">
+<link rel="stylesheet" href="css/indicacao.css?v=1.5.1">
+<link rel="stylesheet" href="css/mobile.css?v=1.5.1">
+<script src="js/tema.js?v=1.5.1"></script>
 </head>
 <body>
 <header><h1>Simulador de desconto por indicação</h1></header>
@@ -21,11 +21,11 @@
     <div class="grid">
       <div>
         <label for="fInd">Fatura de quem indica</label>
-        <div class="in"><span>R$</span><input id="fInd" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00"></div>
+        <div class="in"><span>R$</span><input id="fInd" type="number" inputmode="decimal" min="1" max="10000000" step="0.01" placeholder="0,00"></div>
       </div>
       <div>
         <label for="fInv">Fatura do indicado</label>
-        <div class="in"><span>R$</span><input id="fInv" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00"></div>
+        <div class="in"><span>R$</span><input id="fInv" type="number" inputmode="decimal" min="1" max="10000000" step="0.01" placeholder="0,00"></div>
       </div>
       <div>
         <label for="pInv">Desconto do indicado no 1º mês</label>
@@ -44,8 +44,8 @@
   <footer class="credit">Documento criado por Gustavo Maia</footer>
 </main>
 
-<script src="js/indicacao.js?v=1.5.0"></script>
-<script src="js/rastreio.js?v=1.5.0" data-ferramenta="indicacao" data-alvo="#out" data-valido="#out .hl"></script>
-<script src="js/altura.js?v=1.5.0"></script>
+<script src="js/indicacao.js?v=1.5.1"></script>
+<script src="js/rastreio.js?v=1.5.1" data-ferramenta="indicacao" data-alvo="#out" data-valido="#out .hl"></script>
+<script src="js/altura.js?v=1.5.1"></script>
 </body>
 </html>

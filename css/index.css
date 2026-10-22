@@ -51,7 +51,13 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
 .chave input:checked + .chave-trilho{background:var(--acc)}
 .chave input:checked + .chave-trilho .chave-bolinha{transform:translateX(20px)}
 .chave input:focus-visible + .chave-trilho{outline:2px solid var(--acc);outline-offset:2px}
-@media(max-width:900px){#nav{grid-template-columns:1fr auto}.nav-esq{display:none}.nav-links{grid-column:1/-1;grid-row:2;overflow-x:auto;justify-content:flex-start}.nav-dir{grid-column:2;grid-row:1}.chave-txt{display:none}}
+/* tablets e notebooks pequenos (721 a 1260 px): rótulos curtos com ícone, tudo numa linha só */
+@media(min-width:721px) and (max-width:1260px){
+  #nav .nav-links a{font-size:0;display:flex;align-items:center;gap:6px;padding:8px 12px}
+  .nav-links a::before{content:attr(data-ic);font-size:1.1rem;line-height:1}
+  .nav-links a::after{content:attr(data-curto);font-size:.9rem;font-weight:600}
+  .chave-txt{display:none}
+}
 
 /* versao */
 #nav .versao{padding:0 4px;color:var(--mute);font-size:.8rem;white-space:nowrap}
@@ -83,3 +89,11 @@ iframe{flex:1;width:100%;border:0;background:var(--bg)}
   .nav-links a::after{display:none}
   body{padding-bottom:calc(52px + env(safe-area-inset-bottom))}
 }
+
+/* telas muito estreitas (até 340 px, ex.: Galaxy Z Fold fechado): sem o título, só a chave e a versão */
+@media(max-width:340px){.nav-esq{display:none}.nav-dir{grid-column:1/-1;justify-self:end}}
+
+/* conteúdo principal e link "pular para o conteúdo" */
+main#conteudo{flex:1;display:flex;flex-direction:column;min-height:0;outline:none}
+.pular{position:absolute;left:8px;top:-80px;z-index:100;background:var(--card);color:var(--ink);padding:10px 14px;border:2px solid var(--acc);border-radius:8px;text-decoration:none;font-weight:600}
+.pular:focus{top:8px}

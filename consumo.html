@@ -7,10 +7,10 @@
 <meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f161c" media="(prefers-color-scheme: dark)">
 <title>Validador de lead - consumo médio x faixa de atendimento</title>
-<link rel="stylesheet" href="css/tema.css?v=1.5.0">
-<link rel="stylesheet" href="css/consumo.css?v=1.5.0">
-<link rel="stylesheet" href="css/mobile.css?v=1.5.0">
-<script src="js/tema.js?v=1.5.0"></script>
+<link rel="stylesheet" href="css/tema.css?v=1.5.1">
+<link rel="stylesheet" href="css/consumo.css?v=1.5.1">
+<link rel="stylesheet" href="css/mobile.css?v=1.5.1">
+<script src="js/tema.js?v=1.5.1"></script>
 </head>
 <body>
 <header><h1>Validador de lead – consumo médio x faixa de atendimento</h1></header>
@@ -26,7 +26,7 @@
         <div id="impStatus" class="note" hidden></div>
         <details class="sub">
           <summary>Texto extraído (conferência / colar manualmente)</summary>
-          <textarea id="impTexto" rows="6" placeholder="O texto da fatura aparece aqui. Você também pode colar o texto e reanalisar."></textarea>
+          <textarea id="impTexto" aria-label="Texto da fatura (colar manualmente)" rows="6" placeholder="O texto da fatura aparece aqui. Você também pode colar o texto e reanalisar."></textarea>
           <button class="btn" id="reanalisar" type="button">Reanalisar texto</button>
         </details>
       </details>
@@ -46,9 +46,9 @@
         <div id="outros"></div>
         <h2 class="mt-14">Adicionar produto</h2>
         <div class="addrow oadd">
-          <input type="text" id="oNome" placeholder="Produto (ex.: Chuveiro elétrico)">
-          <input type="number" id="oKwh" min="0" placeholder="kWh/mês">
-          <input type="number" id="oQtd" min="1" step="1" placeholder="Qtd">
+          <input type="text" id="oNome" aria-label="Nome do produto" maxlength="60" placeholder="Produto (ex.: Chuveiro elétrico)">
+          <input type="number" id="oKwh" aria-label="Consumo mensal do produto em kWh" min="0" max="100000" placeholder="kWh/mês">
+          <input type="number" id="oQtd" aria-label="Quantidade do produto" min="1" max="1000" step="1" placeholder="Qtd">
         </div>
         <button class="btn" id="oAdd" type="button">Adicionar produto</button>
       </details>
@@ -132,7 +132,7 @@
           <summary>Parâmetros de atendimento (editáveis)</summary>
           <p class="legend">Os valores vêm do arquivo <code>parametros.js</code> do repositório. Ajustes feitos aqui ficam só neste navegador até serem exportados e publicados.</p>
           <p class="legend" id="paramInfo"></p>
-          <div class="scroll"><table><thead><tr><th>Distribuidora</th><th>Mono</th><th>Bi</th><th>Tri</th><th></th></tr></thead><tbody id="params"></tbody></table></div>
+          <div class="scroll"><table><thead><tr><th>Distribuidora</th><th>Mono</th><th>Bi</th><th>Tri</th><th><span class="sr-only">Remover</span></th></tr></thead><tbody id="params"></tbody></table></div>
           <h2 class="mt-14">Custo de disponibilidade (kWh/mês)</h2>
           <p class="legend">Descontado de cada mês informado para estimar a energia compartilhada. A média estimada não usa esse desconto.</p>
           <div class="dispgrid">
@@ -145,10 +145,10 @@
           <div class="scroll"><table><thead><tr><th>Distribuidora</th><th>Verde</th><th>Amarela</th><th>Verm. I</th><th>Verm. II</th></tr></thead><tbody id="tarifas"></tbody></table></div>
           <h2 class="mt-14">Adicionar / atualizar distribuidora</h2>
           <div class="addrow">
-            <input type="text" id="nNome" placeholder="Nome (ex.: CELESC - SC)">
-            <input type="number" id="nMono" min="0" placeholder="Mono">
-            <input type="number" id="nBi" min="0" placeholder="Bi">
-            <input type="number" id="nTri" min="0" placeholder="Tri">
+            <input type="text" id="nNome" aria-label="Nome da distribuidora" maxlength="40" placeholder="Nome (ex.: CELESC - SC)">
+            <input type="number" id="nMono" aria-label="Consumo mínimo monofásico da nova distribuidora (kWh)" min="0" placeholder="Mono">
+            <input type="number" id="nBi" aria-label="Consumo mínimo bifásico da nova distribuidora (kWh)" min="0" placeholder="Bi">
+            <input type="number" id="nTri" aria-label="Consumo mínimo trifásico da nova distribuidora (kWh)" min="0" placeholder="Tri">
           </div>
           <button class="btn" id="add" type="button">Salvar distribuidora</button>
           <button class="btn" id="restaurar" type="button">Restaurar valores originais</button>
@@ -160,9 +160,9 @@
 </main>
 
 <script src="js/vendor/pdf.min.js"></script>
-<script src="parametros.js?v=1.5.0"></script>
-<script src="js/consumo.js?v=1.5.0"></script>
-<script src="js/rastreio.js?v=1.5.0" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
-<script src="js/altura.js?v=1.5.0"></script>
+<script src="parametros.js?v=1.5.1"></script>
+<script src="js/consumo.js?v=1.5.1"></script>
+<script src="js/rastreio.js?v=1.5.1" data-ferramenta="consumo" data-alvo="#status" data-fechar-em=".card" data-valido="#status.ok, #status.no"></script>
+<script src="js/altura.js?v=1.5.1"></script>
 </body>
 </html>

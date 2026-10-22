@@ -7,7 +7,8 @@ main{max-width:1400px;margin:0 auto;padding:16px}
 /* 3 colunas: [importar/AC/produtos/geração] [dados do lead] [resultado/parâmetros] */
 .layout{display:grid;grid-template-columns:repeat(3,minmax(0,370px));justify-content:space-between;gap:16px;align-items:start}
 @media(max-width:1180px){.layout{grid-template-columns:repeat(2,minmax(0,1fr));justify-content:stretch}}
-@media(max-width:720px){.layout{grid-template-columns:1fr}.col-b{order:1}.col-c{order:2}.col-a{order:3}}
+@media(max-width:720px){.layout{grid-template-columns:minmax(0,1fr)}.col-b{order:1}.col-c{order:2}.col-a{order:3}}
+.col-a,.col-b,.col-c{min-width:0}   /* as tabelas largas rolam dentro do cartão em vez de alargar a página */
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
 h2{font-size:1rem;margin:0 0 12px}
 label{display:block;font-weight:600;font-size:.9rem;margin:10px 0 4px}
@@ -66,3 +67,15 @@ input[type=file]{width:100%}
 #tarifas input{width:74px;padding:4px 6px}
 #tarifas td:first-child{white-space:nowrap;font-size:.85rem}
 #bandeiraInfo{display:block;color:var(--mute);font-size:.8rem;margin-top:4px}
+.mes[aria-invalid="true"]{outline:2px solid var(--no)}
+/* E-02: a lista de produtos e as linhas de AC não podem alargar a coluna no celular */
+.orow>*,.acrow>*{min-width:0}
+.orow span{overflow-wrap:anywhere}
+@media(max-width:480px){.orow{font-size:.8rem;gap:6px}.orow input{padding:6px 4px}}
+/* E-02 (causa real): os formulários de "adicionar distribuidora" e "adicionar produto" tinham campos que não encolhiam e alargavam a página no celular */
+.addrow>*,.oadd>*{min-width:0}
+@media(max-width:480px){
+  .addrow{grid-template-columns:repeat(3,minmax(0,1fr))}.addrow input:first-child{grid-column:1/-1}
+  .oadd{grid-template-columns:repeat(2,minmax(0,1fr))}.oadd input:first-child{grid-column:1/-1}
+}
+.scroll{position:relative}   /* contém o texto .sr-only da coluna "Remover" (senão ele alarga a página em 280 px) */

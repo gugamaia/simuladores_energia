@@ -59,6 +59,49 @@ async function celulares(b, base, ok, erros) {
   await ctx.close();
 }
 
+async function correcoesNavegador(b, base, ok, erros) {
+  const caixa = l => l.boundingBox();
+  // E-02: produto adicionado no consumo, em várias larguras de celular
+  let ctx = await b.newContext({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true }); let p = await ctx.newPage(); p.on('pageerror', e => erros.push(e.message));
+  await p.goto(base + 'index.html#consumo'); await p.waitForTimeout(1300); let f = p.frameLocator('#frame');
+  for (const dt of await f.locator('details').all()) await dt.evaluate(e => { e.open = true; });   // todos os cartões abertos (o de Parâmetros era o que estourava)
+  await f.locator('#oNome').fill('Chuveiro elétrico de 7500 W com nome bem comprido para testar'); await f.locator('#oKwh').fill('90'); await f.locator('#oAdd').click();
+  for (const w of [280, 300, 320, 360, 390, 412, 540]) { await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(450); const sw = await f.locator('html').evaluate(e => e.scrollWidth), hub = await p.evaluate(() => document.documentElement.scrollWidth); ok(sw <= w + 1 && hub <= w + 1, `consumo com todos os cartões abertos e um produto em ${w} px: sem rolagem horizontal`, sw + ' / ' + hub); }
+  await ctx.close();
+  // E-03, E-06, E-10: barra do menu em várias larguras
+  ctx = await b.newContext({ viewport: { width: 1280, height: 800 } }); p = await ctx.newPage(); await p.goto(base + 'index.html#inicio'); await p.waitForTimeout(1000);
+  for (const w of [280, 320, 600, 720, 768, 820, 900, 1024, 1100, 1200, 1260, 1280, 1366, 1920]) {
+    await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(350); const hub = await p.evaluate(() => document.documentElement.scrollWidth); const ls = await p.locator('.nav-links a').all(); let dentro = true, det = ''; for (const a of ls) { const bb = await caixa(a); if (!bb || bb.x < -1 || bb.x + bb.width > w + 1) { dentro = false; det += ' ' + Math.round(bb ? bb.x : -9) + '+' + Math.round(bb ? bb.width : 0); } }
+    const ver = await caixa(p.locator('#versaoNav')), sw = await caixa(p.locator('.chave')); const dir = ver.x + ver.width <= w + 1 && sw.x >= -1;
+    ok(hub <= w + 1 && dentro && dir, `menu em ${w} px: sem rolagem horizontal, 4 abas inteiras na tela, chave e versão visíveis`, `rolagem ${hub}, abas fora:${det || ' nenhuma'}`);
+  }
+  await ctx.close();
+  // proposta em telas estreitas, com os cartões abertos
+  ctx = await b.newContext({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true }); p = await ctx.newPage(); await p.goto(base + 'index.html#proposta'); await p.waitForTimeout(1300); f = p.frameLocator('#frame');
+  for (const dt of await f.locator('details').all()) await dt.evaluate(e => { e.open = true; });
+  for (const w of [280, 300, 320, 360, 390, 412]) { await p.setViewportSize({ width: w, height: 800 }); await p.waitForTimeout(450); const sw = await f.locator('html').evaluate(e => e.scrollWidth), hub = await p.evaluate(() => document.documentElement.scrollWidth); ok(sw <= w + 1 && hub <= w + 1, `proposta com os cartões abertos em ${w} px: sem rolagem horizontal`, sw + ' / ' + hub); }
+  await ctx.close();
+  // E-07: proposta com textos enormes
+  ctx = await b.newContext({ viewport: { width: 1280, height: 900 } }); p = await ctx.newPage(); await p.goto(base + 'proposta.html'); await p.waitForTimeout(1200);
+  await p.evaluate(() => { for (const [id, v] of [['pConsultor', 'M'.repeat(300)], ['pCliente', 'C'.repeat(120)], ['pUC', '9'.repeat(100)]]) { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); } }); await p.waitForTimeout(200);   // valor colocado por programa/colagem, ignorando o maxlength
+  const sobras = await p.evaluate(() => { const o = []; document.querySelectorAll('#capture .px-value,#capture .px-card-value,#capture .px-obs,#capture .px-signature-name,#capture .px-benefit,#capture .px-card-title,#capture .px-signature').forEach(e => { if (e.scrollWidth > e.clientWidth + 1) o.push((e.id || e.className) + ' ' + e.scrollWidth + '>' + e.clientWidth); }); return o; });
+  ok(sobras.length === 0, 'proposta: consultor de 300 letras, cliente de 120 e UC de 100 não estouram a folha', sobras.join('; '));
+  await p.fill('#pConsultor', ''); await p.type('#pConsultor', 'N'.repeat(100)); ok((await p.inputValue('#pConsultor')).length === 60 && (await p.getAttribute('#pConsultor', 'maxlength')) === '60', 'proposta: digitando 100 letras no consultor, o campo para em 60 (limite no navegador)');
+  await ctx.close();
+  // E-13: link de pular para o conteúdo
+  ctx = await b.newContext({ viewport: { width: 1280, height: 800 } }); p = await ctx.newPage(); await p.goto(base + 'index.html#consumo'); await p.waitForTimeout(1200); await p.keyboard.press('Tab');
+  const foc = await p.evaluate(() => { const e = document.activeElement; const r = e.getBoundingClientRect(); return { pular: e.classList.contains('pular'), y: r.y, w: r.width }; });
+  ok(foc.pular && foc.y >= 0 && foc.w > 80, 'menu: o primeiro Tab mostra o link "Pular para o conteúdo" dentro da tela');
+  await p.keyboard.press('Enter'); await p.waitForTimeout(200); ok(await p.evaluate(() => location.hash === '#consumo' && document.activeElement.tagName === 'IFRAME'), 'menu: Enter no link leva o foco à tela aberta e mantém o endereço');
+  await ctx.close();
+  // E-01 e E-05 no navegador real: respondem rápido
+  ctx = await b.newContext({ viewport: { width: 1280, height: 800 } }); p = await ctx.newPage(); await p.goto(base + 'indicacao.html'); await p.waitForTimeout(800);
+  let t = Date.now(); await p.fill('#fInd', '0.01'); await p.fill('#fInv', '1000000'); const msg = await p.textContent('#out'); ok(/entre R\$ 1,00/.test(msg) && Date.now() - t < 3000, 'indicação no navegador: R$ 0,01 contra R$ 1 milhão responde com aviso em ' + (Date.now() - t) + ' ms (antes: aba travava)');
+  t = Date.now(); await p.fill('#fInd', '1e308'); await p.fill('#fInv', '1e308'); ok(/entre R\$ 1,00/.test(await p.textContent('#out')) && Date.now() - t < 3000, 'indicação no navegador: 1e308 responde com aviso');
+  await p.goto(base + 'consumo.html'); await p.waitForTimeout(800); const dur = await p.evaluate(() => { const t0 = performance.now(); analisarFatura('JAN26 '.repeat(100000)); analisarFatura('JAN' + ' '.repeat(200000) + 'x'); return performance.now() - t0; }); ok(dur < 1500, 'leitura de fatura no navegador: dois textos hostis em ' + Math.round(dur) + ' ms (antes: 100 s)');
+  await ctx.close();
+}
+
 (async () => {
   await new Promise(r => servidor.listen(0, r)); const base = 'http://localhost:' + servidor.address().port + '/';
   const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox'] });
@@ -122,6 +165,7 @@ async function celulares(b, base, ok, erros) {
   ok(tCargo.y - (tAt.y + tAt.height) >= 55, 'proposta: espaço livre para o nome entre "Atenciosamente," e o cargo', String(Math.round(tCargo.y - (tAt.y + tAt.height))));
   await f.locator('.px-signature').scrollIntoViewIfNeeded(); await p.screenshot({ path: '/tmp/_assinatura.png' });
   await p.context().close();
+  await correcoesNavegador(b, base, ok, erros);
   await celulares(b, base, ok, erros);
   ok(!erros.length, 'nenhum erro de script no navegador', erros.join(' | '));
   await b.close(); servidor.close();

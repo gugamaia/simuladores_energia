@@ -103,6 +103,8 @@ function rota(){
   });
   window.scrollTo(0,0);
 }
+/* "Pular para o conteúdo": leva o foco ao conteúdo sem mudar o endereço (o endereço escolhe a tela) */
+document.querySelector('.pular').addEventListener('click', e=>{ e.preventDefault(); (TOOLS[location.hash.slice(1)] ? $('frame') : $('conteudo')).focus(); });
 document.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>{ location.hash = b.dataset.k; }));
 window.addEventListener('hashchange', rota);
 rota();
